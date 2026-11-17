@@ -37,6 +37,20 @@ export const MemoriesGallery: React.FC<MemoriesGalleryProps> = ({
     setCurrentIndex((prev) => (prev - 1 + validMemories.length) % validMemories.length);
   };
 
+  // Keyboard navigation support (RTL: ArrowRight = previous, ArrowLeft = next)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (viewMode !== 'single') return;
+      if (e.key === 'ArrowRight') {
+        handlePrev();
+      } else if (e.key === 'ArrowLeft') {
+        handleNext();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, currentIndex, validMemories.length]);
+
   // Rotations for natural scrapbook polaroid feeling (-4deg to +4deg)
   const scrapbookRotations = [-2.5, 3.2, -3.8, 1.8, -1.9, 3.6, -2.8, 2.4, -3.1];
   const activeRotation = scrapbookRotations[currentIndex % scrapbookRotations.length];

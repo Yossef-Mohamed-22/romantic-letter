@@ -51,6 +51,16 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     }
   }, [isOpen, imageUrl]);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Mouse & Touch Pan Handling
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
