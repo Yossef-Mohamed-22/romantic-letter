@@ -21,6 +21,7 @@ import {
   Eye,
   RefreshCw,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../services/api.ts';
 import { DesignSettings, Letter, Memory } from '../types/index.ts';
@@ -1015,6 +1016,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>معاينة الرابط كما يراه المستلم</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            {/* Security Guarantee Notice */}
+            <div className="p-3.5 rounded-xl bg-[#230408]/70 border border-emerald-500/30 text-xs text-cream-200/90 text-right space-y-1.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                <span>حماية كاملة: الرابط للمستلم للقراءة والعرض فقط</span>
+              </div>
+              <p className="text-cream-200/70 leading-relaxed">
+                • المستلم الذي يفتح هذا الرابط لن يرى أي أزرار تعديل أو لوحة تحكم إطلاقاً، ولا يمكنه تغيير الاسم أو الصور أو الرسالة.<br />
+                • التعديل محمي ومحصور فقط بمن يمتلك حساب الأدمن وكلمة المرور الخاصة بك.<br />
+                • للدخول إلى لوحة التحكم من أي جهاز جديد، أضف <code className="text-[#D5B47A] bg-[#590D19]/60 px-1 py-0.5 rounded font-mono">?admin=true</code> لنهاية الرابط.
+              </p>
             </div>
           </div>
         )}
