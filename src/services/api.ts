@@ -52,12 +52,12 @@ export const api = {
     };
   },
 
-  unlockLetter: async (id: string, nameOrPassword: string): Promise<Letter> => {
+  unlockLetter: async (id: string, nameOrPassword?: string): Promise<Letter> => {
     try {
       const res = await fetch(`${API_BASE}/letters/${id}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameOrPassword, password: nameOrPassword }),
+        body: JSON.stringify({ name: nameOrPassword || '', password: nameOrPassword || '' }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -68,30 +68,7 @@ export const api = {
     // Fallback to local store (Vercel)
     const letters = getLocalLetters();
     const letter = letters.find((l) => l.id === id) || INITIAL_DEFAULT_LETTER;
-    const cleanCandidate = (nameOrPassword || '').trim();
-
-    if (!cleanCandidate) {
-      throw new Error('يرجى إدخال اسمكِ الجميل ❤️');
-    }
-
-    const normCandidate = normalizeArabic(cleanCandidate);
-    const normRecipient = normalizeArabic(letter.recipient_name);
-
-    const matches =
-      letter.allow_any_name ||
-      normCandidate === normRecipient ||
-      normRecipient.includes(normCandidate) ||
-      normCandidate.includes(normRecipient) ||
-      cleanCandidate === '123';
-
-    if (!matches) {
-      throw new Error('هذه الرسالة كُتبت لأميرة أخرى.. تأكدي من كتابة اسمكِ بشكل صحيح ❤️');
-    }
-
-    return {
-      ...letter,
-      recipient_name: cleanCandidate,
-    };
+    return letter;
   },
 
   // Admin Auth

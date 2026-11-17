@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Heart, Sparkles } from 'lucide-react';
+import { Heart, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WaxSeal } from './WaxSeal.tsx';
 import { DesignSettings } from '../types/index.ts';
@@ -8,7 +8,7 @@ import { DesignSettings } from '../types/index.ts';
 interface EnvelopeScreenProps {
   letterId: string;
   designSettings: DesignSettings;
-  onUnlockSuccess: (enteredName: string) => Promise<void>;
+  onUnlockSuccess: () => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -18,25 +18,19 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
   onUnlockSuccess,
   isLoading = false,
 }) => {
-  const [enteredName, setEnteredName] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
   const [isOpenAnimationStarted, setIsOpenAnimationStarted] = useState(false);
   const [isFlapOpen, setIsFlapOpen] = useState(false);
   const [isLetterRising, setIsLetterRising] = useState(false);
-  const [shake, setShake] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!enteredName.trim() || isVerifying || isOpenAnimationStarted) return;
-
-    setErrorMsg('');
-    setIsVerifying(true);
+  const handleOpenEnvelope = async () => {
+    if (isOpening || isOpenAnimationStarted) return;
+    setIsOpening(true);
 
     try {
-      await onUnlockSuccess(enteredName.trim());
+      await onUnlockSuccess();
 
-      // Correct name! Trigger envelope opening sequence
+      // Trigger opening animation sequence
       setIsOpenAnimationStarted(true);
 
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -49,8 +43,8 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
 
       // 1. Confetti burst
       confetti({
-        particleCount: 65,
-        spread: 80,
+        particleCount: 75,
+        spread: 85,
         origin: { y: 0.6 },
         colors: ['#D5B47A', '#F2E3C3', '#941B2D', '#FFCCD5', '#E6C68A'],
       });
@@ -65,11 +59,9 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
         setIsLetterRising(true);
       }, 1400);
     } catch (err: any) {
-      setErrorMsg(err.message || 'هذه الرسالة كُتبت لأميرة أخرى.. تأكدي من كتابة اسمكِ بشكل صحيح ❤️');
-      setShake(true);
-      setTimeout(() => setShake(false), 600);
+      console.error('Failed to open envelope:', err);
     } finally {
-      setIsVerifying(false);
+      setIsOpening(false);
     }
   };
 
@@ -78,12 +70,12 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
 
   return (
     <div className="relative w-full min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-12 select-none">
-      {/* Title "لك" above envelope */}
+      {/* Title "لكِ" above envelope */}
       <motion.div
         initial={{ opacity: 0, y: -25 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, ease: 'easeOut' }}
-        className="text-center mb-2.5 sm:mb-6 z-10"
+        className="text-center mb-4 sm:mb-7 z-10"
       >
         <h1
           className="font-aref text-5xl sm:text-7xl font-bold tracking-wider relative inline-block text-transparent bg-clip-text"
@@ -94,17 +86,23 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
         >
           لَـكِ
         </h1>
-        <p className="text-cream-200/80 text-xs sm:text-base font-amiri mt-0.5 tracking-wide">
-          رسالة خاصة ومحفوفة بالسرية لك وحدك
+        <p className="text-cream-200/80 text-xs sm:text-base font-amiri mt-1 tracking-wide">
+          رسالة خاصة ومحفوفة بالحب كُتبت لأجلكِ وحدكِ
         </p>
       </motion.div>
 
-      {/* Envelope Container with realistic 3D perspective */}
+      {/* Envelope Container with realistic 3D perspective - Fully Clickable! */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
+        whileHover={!isOpenAnimationStarted ? { scale: 1.03 } : {}}
+        whileTap={!isOpenAnimationStarted ? { scale: 0.98 } : {}}
+        onClick={!isOpenAnimationStarted ? handleOpenEnvelope : undefined}
         transition={{ duration: 0.8, delay: 0.2 }}
-        className="relative w-full max-w-[310px] sm:max-w-[420px] md:max-w-[460px] h-[195px] sm:h-[265px] md:h-[290px] perspective-[1200px] z-10"
+        className={`relative w-full max-w-[310px] sm:max-w-[420px] md:max-w-[460px] h-[195px] sm:h-[265px] md:h-[290px] perspective-[1200px] z-10 ${
+          !isOpenAnimationStarted ? 'cursor-pointer' : ''
+        }`}
+        title="اضغطي لفتح الرسالة"
       >
         {/* Soft Ambient Floating Movement */}
         <motion.div
@@ -122,7 +120,7 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
         >
           {/* Envelope Main Body Card */}
           <div
-            className="w-full h-full rounded-xl relative shadow-envelope overflow-hidden border border-[#D5B47A]/30"
+            className="w-full h-full rounded-xl relative shadow-envelope overflow-hidden border border-[#D5B47A]/30 transition-shadow duration-300 hover:shadow-[0_12px_35px_rgba(213,180,122,0.35)]"
             style={{
               backgroundColor: envelopeBg,
               backgroundImage: `
@@ -157,7 +155,7 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
                   <div className="w-full h-full border border-[#D5B47A]/50 rounded p-2 flex flex-col items-center justify-center text-center">
                     <Sparkles className="w-5 h-5 text-[#941B2D] mb-1 animate-pulse" />
                     <span className="font-aref text-lg text-[#54232B] font-bold">شخصي المفضل</span>
-                    <span className="text-xs text-[#54232B]/70 font-amiri mt-1">تُفتح بين يديك الآن...</span>
+                    <span className="text-xs text-[#54232B]/70 font-amiri mt-1">تُفتح بين يديكِ الآن...</span>
                   </div>
                 </motion.div>
               )}
@@ -231,98 +229,47 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
               <line x1="460" y1="0" x2="230" y2="195" stroke="#D5B47A" strokeWidth="1.5" strokeOpacity="0.45" />
             </svg>
 
-            {/* Wax Seal positioned at the flap tip */}
-            <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2">
+            {/* Wax Seal positioned at the flap tip - Clickable */}
+            <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 cursor-pointer">
               <WaxSeal
                 isBreaking={isOpenAnimationStarted}
                 accentColor={goldColor}
-                onClick={() => {
-                  if (!isOpenAnimationStarted && enteredName) {
-                    handleSubmit({ preventDefault: () => {} } as any);
-                  }
-                }}
+                onClick={handleOpenEnvelope}
               />
             </div>
           </motion.div>
         </motion.div>
       </motion.div>
 
-      {/* Recipient Name Input Section */}
+      {/* Tap to Open Action Button & Romantic Instruction */}
       <motion.div
-        initial={{ opacity: 0, y: 25 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={
           isOpenAnimationStarted
-            ? { opacity: 0, y: 40, pointerEvents: 'none' }
+            ? { opacity: 0, y: 35, pointerEvents: 'none' }
             : { opacity: 1, y: 0 }
         }
         transition={{ duration: 0.6, delay: 0.3 }}
-        className="mt-8 sm:mt-12 w-full max-w-[320px] sm:max-w-[380px] px-3 z-20"
+        className="mt-8 sm:mt-11 z-20 flex flex-col items-center gap-3 w-full max-w-sm px-4"
       >
-        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
-          <motion.div
-            animate={shake ? { x: [-10, 10, -7, 7, -4, 4, 0] } : {}}
-            transition={{ duration: 0.5 }}
-            className="w-full"
-          >
-            {/* Fully Integrated Responsive Flex Pill Bar - Icons NEVER overflow */}
-            <div className="w-full flex items-center rounded-full bg-[#230408]/90 border border-[#D5B47A]/50 focus-within:border-[#D5B47A] focus-within:ring-2 focus-within:ring-[#D5B47A]/30 shadow-lg backdrop-blur-md p-1 pl-1.5 pr-3.5 transition-all duration-300">
-              
-              {/* Heart icon safely bound inside flex */}
-              <div className="flex-shrink-0 text-[#D5B47A]/75 flex items-center justify-center pointer-events-none">
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-[#D5B47A]/25" />
-              </div>
+        <button
+          onClick={handleOpenEnvelope}
+          disabled={isOpening || isOpenAnimationStarted}
+          className="group relative flex items-center justify-center gap-3 w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-full border border-[#D5B47A]/70 shadow-[0_4px_25px_rgba(213,180,122,0.3)] hover:shadow-[0_4px_35px_rgba(213,180,122,0.55)] hover:border-[#D5B47A] active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, #781324 0%, #590D19 50%, #3B080F 100%)',
+          }}
+        >
+          <Heart className="w-5 h-5 text-rose-400 fill-rose-400 animate-pulse group-hover:scale-125 transition-transform" />
+          <span className="font-aref text-xl sm:text-2xl text-[#F2E3C3] font-bold tracking-wide">
+            اضغطي لفتح الرسالة ❤️
+          </span>
+          <Sparkles className="w-5 h-5 text-[#D5B47A] group-hover:rotate-45 transition-transform" />
+        </button>
 
-              {/* Input is fluid, takes remaining space and never pushes icons out */}
-              <input
-                type="text"
-                value={enteredName}
-                onChange={(e) => {
-                  setEnteredName(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                disabled={isVerifying || isOpenAnimationStarted}
-                placeholder="اسمكِ الجميل ❤️"
-                dir="rtl"
-                className="w-full flex-1 min-w-0 bg-transparent text-[#F2E3C3] placeholder-[#F2E3C3]/50 text-center font-amiri text-base sm:text-lg focus:outline-none px-2"
-              />
-
-              {/* Circular Submit Button safely bound inside flex */}
-              <button
-                type="submit"
-                disabled={isVerifying || !enteredName.trim() || isOpenAnimationStarted}
-                aria-label="فتح الرسالة"
-                className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-md group disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(135deg, #EAD1A0 0%, #D5B47A 50%, #997434 100%)',
-                }}
-              >
-                {isVerifying ? (
-                  <div className="w-4 h-4 border-2 border-[#54232B] border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-[#54232B] group-hover:-translate-x-0.5 transition-transform" />
-                )}
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Animated Error Message */}
-          <AnimatePresence>
-            {errorMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="mt-3 px-4 py-1.5 rounded-full bg-red-950/70 border border-red-500/30 text-rose-200 text-xs sm:text-sm font-amiri text-center flex items-center gap-1.5 backdrop-blur-sm"
-              >
-                <span>{errorMsg}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <p className="mt-3.5 text-xs text-[#F2E3C3]/80 font-amiri text-center">
-            اكتبي اسمكِ لتُفتح لكِ رسالة كُتبت لأجلكِ وحدكِ ❤️
-          </p>
-        </form>
+        <p className="text-xs sm:text-sm text-[#F2E3C3]/80 font-amiri text-center tracking-wide">
+          المسي المظروف أو الختم الذهبي لتُفتح لكِ الرسالة 💌
+        </p>
       </motion.div>
     </div>
   );

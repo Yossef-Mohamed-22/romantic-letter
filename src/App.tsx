@@ -80,7 +80,7 @@ export const App: React.FC = () => {
   }, [letterId]);
 
   // Handle Unlocking
-  const handleUnlock = async (password: string): Promise<void> => {
+  const handleUnlock = async (password?: string): Promise<void> => {
     const letter = await api.unlockLetter(letterId, password);
     setUnlockedLetter(letter);
 

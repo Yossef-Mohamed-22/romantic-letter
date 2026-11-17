@@ -143,20 +143,9 @@ app.get('/api/letters/:id/public', (req: Request, res: Response) => {
   });
 });
 
-// 2. Unlock letter with recipient name or password
+// 2. Unlock letter by clicking (instant direct access to letter)
 app.post('/api/letters/:id/unlock', (req: Request, res: Response) => {
-  const candidate = (req.body.name || req.body.password || '').trim();
   const { id } = req.params;
-
-  if (!candidate) {
-    return res.status(400).json({ error: 'يرجى إدخال اسمكِ الجميل ❤️' });
-  }
-
-  const { valid, resolvedName } = db.verifyLetterNameOrPassword(id, candidate);
-  if (!valid) {
-    return res.status(401).json({ error: 'هذه الرسالة كُتبت لأميرة أخرى.. تأكدي من كتابة اسمكِ بشكل صحيح ❤️' });
-  }
-
   const letter = db.getLetterById(id);
   if (!letter) {
     return res.status(404).json({ error: 'الرسالة غير متوفرة' });
@@ -164,12 +153,11 @@ app.post('/api/letters/:id/unlock', (req: Request, res: Response) => {
 
   const memories = db.getMemoriesForLetter(id);
 
-  // Return full unlocked letter data with the entered name displayed!
   return res.json({
     success: true,
     letter: {
       id: letter.id,
-      recipient_name: resolvedName || candidate || letter.recipient_name,
+      recipient_name: letter.recipient_name,
       title: letter.title,
       message: letter.message,
       closing_message: letter.closing_message,

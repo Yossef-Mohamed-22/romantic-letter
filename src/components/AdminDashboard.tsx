@@ -414,8 +414,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-cream-200 flex items-center justify-between">
-                  <span>اسم المحبوبة (الاسم الذي ستدخله لفتح المظروف)</span>
-                  <span className="text-xs text-[#D5B47A]">المفتاح لفتح الرسالة ❤️</span>
+                  <span>اسم المحبوبة (المهدى إليها الرسالة)</span>
+                  <span className="text-xs text-[#D5B47A]">يظهر في بطاقة الرسالة ❤️</span>
                 </label>
                 <input
                   type="text"
@@ -425,21 +425,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="w-full bg-[#230408] border border-[#D5B47A]/40 rounded-xl px-4 py-2.5 text-[#F2E3C3] focus:outline-none focus:ring-1 focus:ring-[#D5B47A]"
                 />
                 <p className="text-xs text-cream-200/70 mt-1">
-                  عندما تكتب هذا الاسم سيفتح المظروف فوراً ويظهر اسمها في بطاقة الرسالة (مع تسامح تلقائي لجميع أشكال الهمزات والتاء المربوطة سارة/ساره).
+                  يظهر هذا الاسم مباشرة في بطاقة الرسالة الرومانسية (إلى {recipientName || 'شخصي المفضل'} ❤️) بمجرد لمس المظروف.
                 </p>
-
-                {/* Allow any name toggle */}
-                <label className="mt-3 flex items-center gap-2 cursor-pointer p-2.5 rounded-lg bg-[#230408]/60 border border-[#D5B47A]/20">
-                  <input
-                    type="checkbox"
-                    checked={allowAnyName}
-                    onChange={(e) => setAllowAnyName(e.target.checked)}
-                    className="rounded text-[#D5B47A] focus:ring-0"
-                  />
-                  <span className="text-xs text-[#F2E3C3] font-semibold">
-                    السماح بأي اسم (أي اسم ستكتبه سيفتح المظروف ويظهر اسمها في الرسالة مباشرة)
-                  </span>
-                </label>
               </div>
 
               <div>
@@ -957,10 +944,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <div>
               <h2 className="font-aref text-2xl sm:text-3xl font-bold text-[#D5B47A]">
-                إنشاء ومشاركة رابط الرسالة السرية
+                إنشاء ومشاركة رابط الرسالة
               </h2>
               <p className="text-sm text-cream-200/80 mt-1 max-w-md mx-auto">
-                عند إرسال هذا الرابط لشخصك المفضل، سيرى المظروف المغلق بالشمع الذهبي ولن يستطيع فتحه إلا بإدخال كلمتكما السرية!
+                عند إرسال هذا الرابط لشخصك المفضل، سيرى المظروف الملكي وبمجرد لمسه سيفتح فوراً وتظهر الرسالة الرومانسية والموسيقى والذكريات الجميلة!
               </p>
             </div>
 
