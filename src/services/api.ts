@@ -83,8 +83,15 @@ export const api = {
       if (res.ok) return await res.json();
     } catch {}
 
-    // Fallback for Vercel
-    if (email === 'admin@secretletter.com' && password === 'love2026') {
+    // Fallback for Vercel (static hosting): password is checked against a SHA-256 hash
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+    const hash = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    if (
+      email.trim().toLowerCase() === 'admin@secretletter.com' &&
+      hash === '79254b7d90a0016db18d326b2d4acece0c816a0a32aeaa0189525d2956771b6c'
+    ) {
       return {
         token: 'vercel-static-admin-token',
         user: { id: 'admin-1', email, name: 'مدير الرسائل' },

@@ -9,8 +9,8 @@ interface AdminLoginProps {
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel }) => {
-  const [email, setEmail] = useState('admin@secretletter.com');
-  const [password, setPassword] = useState('love2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -98,14 +98,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
               />
               <KeyRound className="w-4 h-4 text-[#D5B47A]/70 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
-          </div>
-
-          <div className="p-2.5 rounded-lg bg-[#230408]/60 border border-[#D5B47A]/20 text-[11px] text-[#D5B47A]/80 leading-relaxed">
-            💡 <strong>بيانات الدخول التجريبية الافتراضية:</strong>
-            <br />
-            البريد: <code className="text-[#F2E3C3]">admin@secretletter.com</code>
-            <br />
-            كلمة المرور: <code className="text-[#F2E3C3]">love2026</code>
           </div>
 
           <div className="pt-2 flex items-center justify-between gap-3">
