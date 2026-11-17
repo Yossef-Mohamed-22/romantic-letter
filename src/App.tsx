@@ -29,9 +29,6 @@ export const App: React.FC = () => {
   const [isLoadingPublicData, setIsLoadingPublicData] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string>('');
 
-  const isAdminQuery = new URLSearchParams(window.location.search).get('admin') === 'true';
-  const canShowAdminControls = Boolean(authToken) || isAdminQuery;
-
   // Design fallback
   const currentDesign: DesignSettings =
     unlockedLetter?.design_settings ||
@@ -135,28 +132,26 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Admin Button: ONLY shown if already logged in or opened with ?admin=true (hidden completely from recipients) */}
-      {canShowAdminControls && (
-        <div className="fixed bottom-3 right-3 z-40 opacity-40 hover:opacity-100 transition-opacity">
-          <button
-            onClick={() => {
-              if (authToken) {
-                setView(view === 'admin' ? 'envelope' : 'admin');
-              } else {
-                setShowLoginModal(true);
-              }
-            }}
-            className="p-2 rounded-full bg-[#230408]/50 hover:bg-[#590D19] border border-[#D5B47A]/25 text-[#D5B47A]/60 hover:text-[#D5B47A] backdrop-blur-md transition-all shadow-sm"
-            title="لوحة تحكم صاحب الرسالة (المدير)"
-          >
-            {authToken && view === 'admin' ? (
-              <Lock className="w-4 h-4" />
-            ) : (
-              <Settings className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      )}
+      {/* Admin Gear Button (Always available - protected by admin password) */}
+      <div className="fixed bottom-3 right-3 z-40 opacity-50 hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => {
+            if (authToken) {
+              setView(view === 'admin' ? 'envelope' : 'admin');
+            } else {
+              setShowLoginModal(true);
+            }
+          }}
+          className="p-2.5 rounded-full bg-[#230408]/80 hover:bg-[#590D19] border border-[#D5B47A]/40 hover:border-[#D5B47A] text-[#D5B47A]/80 hover:text-[#D5B47A] backdrop-blur-md transition-all shadow-md cursor-pointer"
+          title="لوحة تحكم صاحب الرسالة (المدير)"
+        >
+          {authToken && view === 'admin' ? (
+            <Lock className="w-4 h-4 text-[#D5B47A]" />
+          ) : (
+            <Settings className="w-4 h-4 text-[#D5B47A]" />
+          )}
+        </button>
+      </div>
 
       {/* Views Router */}
       <AnimatePresence mode="wait">
