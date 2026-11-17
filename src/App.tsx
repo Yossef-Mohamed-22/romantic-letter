@@ -64,6 +64,12 @@ export const App: React.FC = () => {
       setLoadError('');
       try {
         const data = await api.getPublicLetter(letterId);
+        const params = new URLSearchParams(window.location.search);
+        const musicParam = params.get('music');
+        if (musicParam) {
+          data.music_url = musicParam;
+          data.music_enabled = true;
+        }
         setPublicData(data);
       } catch (err: any) {
         console.error('Failed to load letter public data:', err);
@@ -79,6 +85,16 @@ export const App: React.FC = () => {
   // Handle Unlocking
   const handleUnlock = async (password?: string): Promise<void> => {
     const letter = await api.unlockLetter(letterId, password);
+    const params = new URLSearchParams(window.location.search);
+    const musicParam = params.get('music');
+    if (musicParam) {
+      letter.music_url = musicParam;
+      letter.music_enabled = true;
+    }
+    const toParam = params.get('to');
+    if (toParam) {
+      letter.recipient_name = toParam;
+    }
     setUnlockedLetter(letter);
 
     // Fast, responsive, buttery-smooth transition to letter view

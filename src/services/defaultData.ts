@@ -15,7 +15,7 @@ export const DEFAULT_DESIGN: DesignSettings = {
 
 export const DEFAULT_MEMORIES: Omit<Memory, 'id' | 'letter_id'>[] = [
   {
-    image_url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1000&auto=format&fit=crop',
+    image_url: '/images/memory-1.jpg',
     caption: 'أول لقاء وأجمل صدفة جمعتنا.. حين ابتدأ العمر حقاً ❤️',
     display_order: 1,
   },

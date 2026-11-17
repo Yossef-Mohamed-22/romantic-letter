@@ -292,7 +292,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setActivePlayingPresetId(null);
   };
 
-  const shareableUrl = `${window.location.origin}/?letter=${currentLetterId}`;
+  const shareableUrl = React.useMemo(() => {
+    let url = `${window.location.origin}/?letter=${currentLetterId || 'secret-love-letter'}`;
+    if (musicUrl && musicUrl.startsWith('http')) {
+      url += `&music=${encodeURIComponent(musicUrl)}`;
+    }
+    if (recipientName && recipientName.trim()) {
+      url += `&to=${encodeURIComponent(recipientName.trim())}`;
+    }
+    return url;
+  }, [currentLetterId, musicUrl, recipientName]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(shareableUrl);
@@ -881,10 +890,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </label>
                 {musicUrl.startsWith('idb://') && (
-                  <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>تم رفع وحفظ ملفك الصوتي بنجاح وجاهز للتشغيل!</span>
-                  </p>
+                  <div className="mt-2 p-3 rounded-lg bg-[#590D19]/40 border border-[#D5B47A]/30 text-xs text-cream-200/90 leading-relaxed text-right space-y-1">
+                    <p className="text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>تم حفظ ملفك الصوتي بنجاح على هذا المتصفح!</span>
+                    </p>
+                    <p className="text-cream-200/70 text-[11px]">
+                      💡 لمشاركة الرابط مع أي شخص حول العالم ليعمل الصوت فوراً على أي هاتف، يُفضل اختيار إحدى المقطوعات الـ 5 بالأعلى أو وضع رابط MP3 مباشر لتضمينه في رابط المشاركة.
+                    </p>
+                  </div>
                 )}
               </div>
 
