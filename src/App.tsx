@@ -10,6 +10,7 @@ import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { AdminLogin } from './components/AdminLogin.tsx';
 import { api } from './services/api.ts';
 import { Letter, LetterPublicMetadata, DesignSettings } from './types/index.ts';
+import { decodeLetterFromPayload } from './services/letterCodec.ts';
 
 const DEFAULT_LETTER_ID = 'secret-love-letter';
 
@@ -18,6 +19,16 @@ export const App: React.FC = () => {
   const getLetterIdFromUrl = (): string => {
     const params = new URLSearchParams(window.location.search);
     return params.get('letter') || DEFAULT_LETTER_ID;
+  };
+
+  // Helper to extract custom encoded payload from URL (?data=... or #data=...)
+  const getEncodedPayloadFromUrl = (): Partial<Letter> | null => {
+    const params = new URLSearchParams(window.location.search);
+    const dataParam = params.get('data') || (window.location.hash.startsWith('#data=') ? window.location.hash.replace('#data=', '') : '');
+    if (dataParam) {
+      return decodeLetterFromPayload(dataParam);
+    }
+    return null;
   };
 
   const [letterId, setLetterId] = useState<string>(getLetterIdFromUrl());
@@ -63,13 +74,30 @@ export const App: React.FC = () => {
       setIsLoadingPublicData(true);
       setLoadError('');
       try {
+        const payloadData = getEncodedPayloadFromUrl();
         const data = await api.getPublicLetter(letterId);
+
+        if (payloadData) {
+          if (payloadData.title) data.title = payloadData.title;
+          if (payloadData.music_url) {
+            data.music_url = payloadData.music_url;
+            data.music_enabled = payloadData.music_enabled !== false;
+          }
+          if (payloadData.design_settings) {
+            data.design_settings = {
+              ...data.design_settings,
+              ...payloadData.design_settings,
+            };
+          }
+        }
+
         const params = new URLSearchParams(window.location.search);
         const musicParam = params.get('music');
         if (musicParam) {
           data.music_url = musicParam;
           data.music_enabled = true;
         }
+
         setPublicData(data);
       } catch (err: any) {
         console.error('Failed to load letter public data:', err);
@@ -84,18 +112,45 @@ export const App: React.FC = () => {
 
   // Handle Unlocking
   const handleUnlock = async (password?: string): Promise<void> => {
-    const letter = await api.unlockLetter(letterId, password);
+    const baseLetter = await api.unlockLetter(letterId, password);
+    const payloadData = getEncodedPayloadFromUrl();
+
+    let mergedLetter: Letter = {
+      ...baseLetter,
+    };
+
+    if (payloadData) {
+      if (payloadData.title) mergedLetter.title = payloadData.title;
+      if (payloadData.recipient_name) mergedLetter.recipient_name = payloadData.recipient_name;
+      if (payloadData.message) mergedLetter.message = payloadData.message;
+      if (payloadData.closing_message) mergedLetter.closing_message = payloadData.closing_message;
+      if (payloadData.music_url) {
+        mergedLetter.music_url = payloadData.music_url;
+        mergedLetter.music_enabled = payloadData.music_enabled !== false;
+      }
+      if (payloadData.design_settings) {
+        mergedLetter.design_settings = {
+          ...mergedLetter.design_settings,
+          ...payloadData.design_settings,
+        };
+      }
+      if (payloadData.memories && payloadData.memories.length > 0) {
+        mergedLetter.memories = payloadData.memories;
+      }
+    }
+
     const params = new URLSearchParams(window.location.search);
     const musicParam = params.get('music');
     if (musicParam) {
-      letter.music_url = musicParam;
-      letter.music_enabled = true;
+      mergedLetter.music_url = musicParam;
+      mergedLetter.music_enabled = true;
     }
     const toParam = params.get('to');
     if (toParam) {
-      letter.recipient_name = toParam;
+      mergedLetter.recipient_name = toParam;
     }
-    setUnlockedLetter(letter);
+
+    setUnlockedLetter(mergedLetter);
 
     // Fast, responsive, buttery-smooth transition to letter view
     setTimeout(() => {
@@ -117,12 +172,20 @@ export const App: React.FC = () => {
     setView('envelope');
   };
 
-  const handlePreviewLetter = (previewId: string) => {
+  const handlePreviewLetter = (previewId: string, encodedPayload?: string) => {
     setLetterId(previewId);
     setUnlockedLetter(null);
     setView('envelope');
-    window.history.pushState({}, '', `/?letter=${previewId}`);
+    if (encodedPayload) {
+      window.history.pushState({}, '', `/?data=${encodedPayload}`);
+    } else {
+      window.history.pushState({}, '', `/?letter=${previewId}`);
+    }
   };
+
+  // Check if admin gear should be visible: ONLY if creator has token or URL has ?admin=true
+  const params = new URLSearchParams(window.location.search);
+  const showAdminGear = Boolean(authToken) || params.get('admin') === 'true';
 
   return (
     <div
@@ -148,26 +211,28 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Admin Gear Button (Always available - protected by admin password) */}
-      <div className="fixed bottom-3 right-3 z-40 opacity-50 hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => {
-            if (authToken) {
-              setView(view === 'admin' ? 'envelope' : 'admin');
-            } else {
-              setShowLoginModal(true);
-            }
-          }}
-          className="p-2.5 rounded-full bg-[#230408]/80 hover:bg-[#590D19] border border-[#D5B47A]/40 hover:border-[#D5B47A] text-[#D5B47A]/80 hover:text-[#D5B47A] backdrop-blur-md transition-all shadow-md cursor-pointer"
-          title="لوحة تحكم صاحب الرسالة (المدير)"
-        >
-          {authToken && view === 'admin' ? (
-            <Lock className="w-4 h-4 text-[#D5B47A]" />
-          ) : (
-            <Settings className="w-4 h-4 text-[#D5B47A]" />
-          )}
-        </button>
-      </div>
+      {/* Admin Gear Button - ONLY visible to creator/admin, completely hidden from normal letter recipients */}
+      {showAdminGear && (
+        <div className="fixed bottom-3 right-3 z-40 opacity-70 hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => {
+              if (authToken) {
+                setView(view === 'admin' ? 'envelope' : 'admin');
+              } else {
+                setShowLoginModal(true);
+              }
+            }}
+            className="p-2.5 rounded-full bg-[#230408]/80 hover:bg-[#590D19] border border-[#D5B47A]/40 hover:border-[#D5B47A] text-[#D5B47A]/80 hover:text-[#D5B47A] backdrop-blur-md transition-all shadow-md cursor-pointer"
+            title="لوحة تحكم صاحب الرسالة (المدير)"
+          >
+            {authToken && view === 'admin' ? (
+              <Lock className="w-4 h-4 text-[#D5B47A]" />
+            ) : (
+              <Settings className="w-4 h-4 text-[#D5B47A]" />
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Views Router */}
       <AnimatePresence mode="wait">

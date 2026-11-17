@@ -32,10 +32,13 @@ import { DesignSettings, Letter, Memory } from '../types/index.ts';
 import { ImageCropperModal } from './ImageCropperModal.tsx';
 import { ROMANTIC_MUSIC_PRESETS } from '../services/musicPresets.ts';
 import { resolveAudioUrl } from '../services/storage.ts';
+import { encodeLetterToPayload } from '../services/letterCodec.ts';
+
+const PRODUCTION_DOMAIN = 'https://romantic-letter-mu.vercel.app';
 
 interface AdminDashboardProps {
   onLogout: () => void;
-  onPreviewLetter: (letterId: string) => void;
+  onPreviewLetter: (letterId: string, encodedPayload?: string) => void;
   token: string;
 }
 
@@ -292,21 +295,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setActivePlayingPresetId(null);
   };
 
+  const [useVercelDomain, setUseVercelDomain] = useState<boolean>(true);
+  const [generateSuccessMessage, setGenerateSuccessMessage] = useState<string>('');
+
+  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  // Compute live payload string from all letter fields
+  const payloadEncoded = React.useMemo(() => {
+    return encodeLetterToPayload({
+      title,
+      recipient_name: recipientName,
+      message,
+      closing_message: closingMessage,
+      music_url: musicUrl,
+      music_enabled: musicEnabled,
+      design_settings: designSettings,
+      memories,
+    });
+  }, [title, recipientName, message, closingMessage, musicUrl, musicEnabled, designSettings, memories]);
+
   const shareableUrl = React.useMemo(() => {
-    let url = `${window.location.origin}/?letter=${currentLetterId || 'secret-love-letter'}`;
-    if (musicUrl && musicUrl.startsWith('http')) {
-      url += `&music=${encodeURIComponent(musicUrl)}`;
-    }
-    if (recipientName && recipientName.trim()) {
-      url += `&to=${encodeURIComponent(recipientName.trim())}`;
-    }
-    return url;
-  }, [currentLetterId, musicUrl, recipientName]);
+    const base = (isLocalhost && useVercelDomain) ? PRODUCTION_DOMAIN : window.location.origin;
+    return `${base}/?data=${payloadEncoded}`;
+  }, [payloadEncoded, useVercelDomain, isLocalhost]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(shareableUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleGenerateLink = async () => {
+    await handleSave();
+    navigator.clipboard.writeText(shareableUrl);
+    setCopiedLink(true);
+    setGenerateSuccessMessage('تم إنشاء وتحديث رابط الرسالة بنجاح بكل تعديلاتك، وتم نسخه لحافظتك جاهزاً للمشاركة! ❤️');
+    setTimeout(() => {
+      setCopiedLink(false);
+      setGenerateSuccessMessage('');
+    }, 4500);
   };
 
   if (isLoading) {
@@ -1173,16 +1200,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 إنشاء ومشاركة رابط الرسالة
               </h2>
               <p className="text-sm text-cream-200/80 mt-1 max-w-md mx-auto">
-                عند إرسال هذا الرابط لشخصك المفضل، سيرى المظروف الملكي وبمجرد لمسه سيفتح فوراً وتظهر الرسالة الرومانسية والموسيقى والذكريات الجميلة!
+                عند إرسال هذا الرابط لشخصك المفضل، سيرى المظروف الملكي وبمجرد لمسه سيفتح فوراً وتظهر الرسالة الرومانسية بكل تعديلاتك وكلماتك والموسيقى والذكريات الجميلة!
               </p>
             </div>
 
             {/* Big Action Button */}
-            <div className="py-2">
+            <div className="py-2 space-y-3">
               <button
-                onClick={handleSave}
+                onClick={handleGenerateLink}
                 disabled={isSaving}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-full font-aref text-xl font-bold transition-all duration-300 shadow-xl flex items-center justify-center gap-3 mx-auto"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full font-aref text-xl font-bold transition-all duration-300 shadow-xl flex items-center justify-center gap-3 mx-auto cursor-pointer"
                 style={{
                   background: 'linear-gradient(135deg, #8A1525 0%, #590D19 50%, #3B080F 100%)',
                   color: '#F2E3C3',
@@ -1190,9 +1217,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 }}
               >
                 <Heart className="w-6 h-6 text-rose-300 fill-rose-300" />
-                <span>إنشاء رابط الرسالة ❤️</span>
+                <span>إنشاء وتحديث رابط الرسالة ❤️</span>
               </button>
+
+              {generateSuccessMessage && (
+                <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-sm font-semibold flex items-center justify-center gap-2">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                  <span>{generateSuccessMessage}</span>
+                </div>
+              )}
             </div>
+
+            {/* Localhost vs Vercel Domain Switcher */}
+            {isLocalhost && (
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs bg-[#230408]/80 p-2.5 rounded-xl border border-[#D5B47A]/30">
+                <span className="text-cream-200/70 font-semibold">توجيه الرابط:</span>
+                <button
+                  type="button"
+                  onClick={() => setUseVercelDomain(true)}
+                  className={`px-3 py-1.5 rounded-lg transition-all text-xs cursor-pointer ${
+                    useVercelDomain
+                      ? 'bg-[#590D19] text-[#D5B47A] font-bold border border-[#D5B47A]/50 shadow'
+                      : 'text-cream-200/60 hover:text-cream-200'
+                  }`}
+                >
+                  رابط Vercel العام (الموصى به للهواتف والأجهزة الأخرى)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseVercelDomain(false)}
+                  className={`px-3 py-1.5 rounded-lg transition-all text-xs cursor-pointer ${
+                    !useVercelDomain
+                      ? 'bg-[#590D19] text-[#D5B47A] font-bold border border-[#D5B47A]/50 shadow'
+                      : 'text-cream-200/60 hover:text-cream-200'
+                  }`}
+                >
+                  رابط جهازي الحالي (Localhost)
+                </button>
+              </div>
+            )}
 
             {/* Shareable Link Box */}
             <div className="p-4 rounded-xl bg-[#230408] border border-[#D5B47A]/40 flex flex-col sm:flex-row items-center gap-3">
@@ -1204,7 +1267,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
               <button
                 onClick={copyToClipboard}
-                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#590D19] hover:bg-[#781324] border border-[#D5B47A]/50 text-xs text-[#F2E3C3] flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#590D19] hover:bg-[#781324] border border-[#D5B47A]/50 text-xs text-[#F2E3C3] flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
               >
                 {copiedLink ? (
                   <>
@@ -1223,8 +1286,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Test Link Button */}
             <div>
               <button
-                onClick={() => onPreviewLetter(currentLetterId)}
-                className="text-sm text-[#D5B47A] hover:underline flex items-center justify-center gap-1.5 mx-auto"
+                onClick={() => onPreviewLetter(currentLetterId, payloadEncoded)}
+                className="text-sm text-[#D5B47A] hover:underline flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
               >
                 <span>معاينة الرابط كما يراه المستلم</span>
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -1238,9 +1301,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>حماية كاملة: الرابط للمستلم للقراءة والعرض فقط</span>
               </div>
               <p className="text-cream-200/70 leading-relaxed">
-                • المستلم الذي يفتح هذا الرابط لن يرى أي أزرار تعديل أو لوحة تحكم إطلاقاً، ولا يمكنه تغيير الاسم أو الصور أو الرسالة.<br />
-                • التعديل محمي ومحصور فقط بمن يمتلك حساب الأدمن وكلمة المرور الخاصة بك.<br />
-                • للدخول إلى لوحة التحكم من أي جهاز جديد، أضف <code className="text-[#D5B47A] bg-[#590D19]/60 px-1 py-0.5 rounded font-mono">?admin=true</code> لنهاية الرابط.
+                • هذا الرابط مشفّر ويحتوي على نص رسالتك الكامل، والتعديلات، والصور، والموسيقى بدقة، ويعمل على أي هاتف في العالم فوراً.<br />
+                • المستلم الذي يفتح هذا الرابط لن يرى أي أزرار أو تروس تحكم إطلاقاً، ولا يمكنه تغيير الاسم أو الصور أو الرسالة.<br />
+                • لوحة التحكم محمية بحساب الأدمن وكلمة المرور الخاصة بك، وللدخول إليها أضف <code className="text-[#D5B47A] bg-[#590D19]/60 px-1 py-0.5 rounded font-mono">?admin=true</code> لنهاية الرابط.
               </p>
             </div>
           </div>
