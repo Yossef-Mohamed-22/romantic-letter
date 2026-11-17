@@ -33,6 +33,7 @@ import { ImageCropperModal } from './ImageCropperModal.tsx';
 import { ROMANTIC_MUSIC_PRESETS } from '../services/musicPresets.ts';
 import { resolveAudioUrl, getAudioFromIDB } from '../services/storage.ts';
 import { encodeLetterToPayload } from '../services/letterCodec.ts';
+import { shortenUrl } from '../services/shortUrl.ts';
 import { uploadImageToCloud, uploadAudioToCloud } from '../services/cloudUpload.ts';
 
 const PRODUCTION_DOMAIN = 'https://romantic-letter-mu.vercel.app';
@@ -432,8 +433,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return `${base}/?data=${payloadEncoded}`;
   }, [payloadEncoded, useVercelDomain, isLocalhost]);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(shareableUrl);
+  const copyToClipboard = async () => {
+    const shortUrl = await shortenUrl(shareableUrl);
+    await navigator.clipboard.writeText(shortUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
   };
@@ -478,7 +480,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const base = isLocalhost && useVercelDomain ? PRODUCTION_DOMAIN : window.location.origin;
       const freshUrl = `${base}/?data=${freshPayload}`;
 
-      await navigator.clipboard.writeText(freshUrl);
+      const shortUrl = await shortenUrl(freshUrl);
+      await navigator.clipboard.writeText(shortUrl);
       setCopiedLink(true);
       setGenerateSuccessMessage('تم إنشاء وتحديث رابط الرسالة بنجاح بكل الصور والموسيقى وتعديلاتك، وتم نسخه لحافظتك جاهزاً للمشاركة! ❤️');
       setTimeout(() => {
