@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX, Music } from 'lucide-react';
+import { resolveAudioUrl } from '../services/storage.ts';
 
 interface MusicPlayerProps {
   musicUrl?: string;
@@ -16,11 +17,29 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [audioSource, setAudioSource] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const fallbackAudio =
     'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=romantic-piano-112199.mp3';
   const effectiveUrl = musicUrl || fallbackAudio;
+
+  // Resolve IndexedDB or regular URL
+  useEffect(() => {
+    let isMounted = true;
+    const resolve = async () => {
+      if (effectiveUrl.startsWith('idb://')) {
+        const resolved = await resolveAudioUrl(effectiveUrl);
+        if (isMounted) setAudioSource(resolved || fallbackAudio);
+      } else {
+        if (isMounted) setAudioSource(effectiveUrl);
+      }
+    };
+    resolve();
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveUrl]);
 
   // Attempt play when autoPlayTrigger becomes true (after envelope opened)
   useEffect(() => {
@@ -58,7 +77,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   return (
     <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-      <audio ref={audioRef} src={effectiveUrl} loop preload="auto" />
+      <audio ref={audioRef} src={audioSource || effectiveUrl} loop preload="auto" />
 
       <button
         onClick={togglePlay}

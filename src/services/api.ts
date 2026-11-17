@@ -1,5 +1,6 @@
 import { DesignSettings, Letter, LetterPublicMetadata, Memory } from '../types/index.ts';
 import { INITIAL_DEFAULT_LETTER, DEFAULT_DESIGN, DEFAULT_MEMORIES } from './defaultData.ts';
+import { saveAudioToIDB } from './storage.ts';
 
 const API_BASE = '/api';
 const LOCAL_STORAGE_KEY = 'romantic_secret_letters_store';
@@ -275,11 +276,9 @@ export const api = {
       }
     } catch {}
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('فشل معالجة الملف الصوتي'));
-      reader.readAsDataURL(file);
-    });
+    // Fallback: Save to client IndexedDB without exceeding localStorage quota
+    const storageKey = `music_${Date.now()}`;
+    await saveAudioToIDB(storageKey, file);
+    return `idb://${storageKey}`;
   },
 };

@@ -22,9 +22,16 @@ import {
   RefreshCw,
   Sparkles,
   ShieldCheck,
+  Crop,
+  Play,
+  Pause,
+  Volume2,
 } from 'lucide-react';
 import { api } from '../services/api.ts';
 import { DesignSettings, Letter, Memory } from '../types/index.ts';
+import { ImageCropperModal } from './ImageCropperModal.tsx';
+import { ROMANTIC_MUSIC_PRESETS } from '../services/musicPresets.ts';
+import { resolveAudioUrl } from '../services/storage.ts';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -62,7 +69,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicUrl, setMusicUrl] = useState('');
   const [isMusicPreviewPlaying, setIsMusicPreviewPlaying] = useState(false);
+  const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState('');
+  const [activePlayingPresetId, setActivePlayingPresetId] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Image Cropper State
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageUrl, setCropperImageUrl] = useState('');
+  const [cropperTargetIndex, setCropperTargetIndex] = useState<number | null>(null);
+
+  // Resolve Audio Preview URL whenever musicUrl changes
+  useEffect(() => {
+    let isMounted = true;
+    resolveAudioUrl(musicUrl).then((url) => {
+      if (isMounted) setResolvedPreviewUrl(url);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [musicUrl]);
 
   // Design Settings
   const [designSettings, setDesignSettings] = useState<DesignSettings>({
@@ -79,13 +104,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   });
 
   // Load letters from API
-  const loadLetters = async () => {
+  const loadLetters = async (shouldSelect: boolean = true) => {
     setIsLoading(true);
     try {
       const data = await api.getLetters(token);
       setLetters(data);
-      if (data.length > 0) {
-        const selected = data[0];
+      if (shouldSelect && data.length > 0) {
+        const selected = data.find((d) => d.id === currentLetterId) || data[0];
         selectLetter(selected);
       }
     } catch (err: any) {
@@ -142,7 +167,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-      await loadLetters();
+      // Reload list without overwriting the active form fields
+      await loadLetters(false);
     } catch (err: any) {
       setErrorMsg(err.message || 'فشل في حفظ التعديلات');
     } finally {
@@ -160,7 +186,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         secret_password: '123',
         design_settings: designSettings,
       });
-      await loadLetters();
+      await loadLetters(true);
       selectLetter(newLetter);
       setActiveTab('letter');
     } catch (err: any) {
@@ -173,22 +199,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!window.confirm('هل أنت متأكد من حذف هذه الرسالة نهائياً؟')) return;
     try {
       await api.deleteLetter(token, currentLetterId);
-      await loadLetters();
+      await loadLetters(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'فشل في حذف الرسالة');
     }
   };
 
-  // Memory Actions
+  // Memory Actions & Image Cropping
   const handleMemoryUpload = async (index: number, file: File) => {
     try {
-      const url = await api.uploadImage(token, file);
-      const updated = [...memories];
-      updated[index] = { ...updated[index], image_url: url };
-      setMemories(updated);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const rawUrl = reader.result as string;
+        setCropperTargetIndex(index);
+        setCropperImageUrl(rawUrl);
+        setCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
-      alert(err.message || 'فشل رفع الصورة');
+      alert(err.message || 'فشل قراءة ملف الصورة');
     }
+  };
+
+  const handleOpenCropperForMemory = (index: number) => {
+    if (!memories[index]?.image_url) return;
+    setCropperTargetIndex(index);
+    setCropperImageUrl(memories[index].image_url);
+    setCropperOpen(true);
+  };
+
+  const handleCropComplete = (croppedDataUrl: string) => {
+    if (cropperTargetIndex === null) return;
+    const updated = [...memories];
+    updated[cropperTargetIndex] = {
+      ...updated[cropperTargetIndex],
+      image_url: croppedDataUrl,
+    };
+    setMemories(updated);
+    setCropperOpen(false);
+    setCropperTargetIndex(null);
   };
 
   const handleAddMemory = () => {
@@ -221,15 +270,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setMemories(updated);
   };
 
-  // Music upload
+  // Music upload & Presets
   const handleMusicUpload = async (file: File) => {
     try {
       const url = await api.uploadMusic(token, file);
       setMusicUrl(url);
       setMusicEnabled(true);
+      const resolved = await resolveAudioUrl(url);
+      setResolvedPreviewUrl(resolved);
+      setIsMusicPreviewPlaying(false);
     } catch (err: any) {
       alert(err.message || 'فشل رفع الملف الصوتي');
     }
+  };
+
+  const handleSelectMusicPreset = (presetUrl: string) => {
+    setMusicUrl(presetUrl);
+    setMusicEnabled(true);
+    setResolvedPreviewUrl(presetUrl);
+    setIsMusicPreviewPlaying(false);
+    setActivePlayingPresetId(null);
   };
 
   const shareableUrl = `${window.location.origin}/?letter=${currentLetterId}`;
@@ -580,27 +640,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Image Preview & Upload */}
-                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-black/40 border border-[#D5B47A]/30 mb-3 group">
+                  {/* Image Preview & Upload & Crop */}
+                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-black/40 border border-[#D5B47A]/30 mb-2 group">
                     <img
                       src={mem.image_url}
                       alt={mem.caption}
                       className="w-full h-full object-cover"
                     />
-                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200">
-                      <Upload className="w-6 h-6 text-[#D5B47A] mb-1" />
-                      <span className="text-xs text-white">تغيير الصورة</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleMemoryUpload(index, file);
-                        }}
-                      />
-                    </label>
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity duration-200 p-2">
+                      <label className="flex-1 py-2 px-2 rounded-lg bg-[#590D19] hover:bg-[#781324] border border-[#D5B47A]/50 text-center cursor-pointer flex flex-col items-center justify-center transition-colors">
+                        <Upload className="w-4 h-4 text-[#D5B47A] mb-0.5" />
+                        <span className="text-[11px] text-[#F2E3C3]">صورة جديدة</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleMemoryUpload(index, file);
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCropperForMemory(index)}
+                        className="flex-1 py-2 px-2 rounded-lg bg-[#230408] hover:bg-[#3B080F] border border-[#D5B47A]/50 text-center flex flex-col items-center justify-center transition-colors"
+                      >
+                        <Crop className="w-4 h-4 text-[#D5B47A] mb-0.5" />
+                        <span className="text-[11px] text-[#F2E3C3]">قص وتعديل</span>
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Crop & Edit Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCropperForMemory(index)}
+                    className="w-full mb-2 py-1.5 px-3 rounded-lg bg-[#230408] hover:bg-[#590D19] border border-[#D5B47A]/35 text-xs text-[#D5B47A] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Crop className="w-3.5 h-3.5 text-[#D5B47A]" />
+                    <span>قص وضبط المقاس (Crop)</span>
+                  </button>
 
                   {/* Image URL input */}
                   <div className="mb-2.5">
@@ -642,7 +722,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="max-w-2xl mx-auto space-y-6 bg-[#3B080F]/70 p-6 rounded-2xl border border-[#D5B47A]/25 shadow-lg">
             <h2 className="font-aref text-xl font-bold text-[#D5B47A] flex items-center gap-2">
               <Music className="w-5 h-5" />
-              <span>إعدادات الموسيقى الخلفية</span>
+              <span>إعدادات ومكتبة الموسيقى الرومانسية</span>
             </h2>
 
             {/* Toggle Switch */}
@@ -656,7 +736,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setMusicEnabled(!musicEnabled)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${
+                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                   musicEnabled ? 'bg-[#D5B47A]' : 'bg-gray-700'
                 }`}
               >
@@ -668,66 +748,198 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            {/* Music URL */}
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 text-cream-200">
-                رابط المقطع الصوتي (MP3)
+            {/* Curated Romantic Music Presets */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-[#D5B47A] flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#D5B47A]" />
+                <span>اختر مقطعاً رومانسياً جاهزاً (مضمون العمل على كل الأجهزة):</span>
               </label>
-              <input
-                type="text"
-                value={musicUrl}
-                onChange={(e) => setMusicUrl(e.target.value)}
-                placeholder="https://example.com/romantic-melody.mp3"
-                className="w-full bg-[#230408] border border-[#D5B47A]/40 rounded-xl px-4 py-2.5 text-[#F2E3C3] focus:outline-none focus:ring-1 focus:ring-[#D5B47A]"
-              />
-            </div>
 
-            {/* MP3 File Upload */}
-            <div>
-              <label className="block text-sm font-semibold mb-1.5 text-cream-200">
-                أو ارفع ملف صوتي من جهازك
-              </label>
-              <label className="border-2 border-dashed border-[#D5B47A]/40 hover:border-[#D5B47A] rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-[#230408]/60 transition-colors">
-                <Upload className="w-8 h-8 text-[#D5B47A] mb-2" />
-                <span className="text-sm font-semibold text-cream-200">انقر هنا لاختيار ملف MP3</span>
-                <span className="text-xs text-cream-200/50 mt-1">يدعم ملفات MP3, WAV حتى 25 ميجابايت</span>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleMusicUpload(file);
-                  }}
-                />
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-2.5">
+                {ROMANTIC_MUSIC_PRESETS.map((preset) => {
+                  const isSelected = musicUrl === preset.url;
+                  const isPresetPlaying =
+                    isMusicPreviewPlaying && resolvedPreviewUrl === preset.url;
 
-            {/* Audio Preview Player */}
-            {musicUrl && (
-              <div className="p-4 rounded-xl bg-[#230408] border border-[#D5B47A]/30 flex items-center justify-between">
-                <span className="text-xs text-cream-200/80 truncate max-w-[200px]">
-                  {musicUrl}
-                </span>
-                <audio ref={previewAudioRef} src={musicUrl} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!previewAudioRef.current) return;
-                    if (isMusicPreviewPlaying) {
-                      previewAudioRef.current.pause();
-                      setIsMusicPreviewPlaying(false);
-                    } else {
-                      previewAudioRef.current.play();
-                      setIsMusicPreviewPlaying(true);
-                    }
-                  }}
-                  className="px-3 py-1 rounded-full bg-[#590D19] border border-[#D5B47A]/40 text-xs text-[#D5B47A]"
-                >
-                  {isMusicPreviewPlaying ? 'إيقاف المعاينة' : 'تشغيل المقطع'}
-                </button>
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-[#590D19]/60 border-[#D5B47A] shadow-md'
+                          : 'bg-[#230408]/80 border-[#D5B47A]/25 hover:border-[#D5B47A]/50'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-aref text-sm font-bold text-[#F2E3C3]">
+                            {preset.name}
+                          </span>
+                          {isSelected && (
+                            <span className="px-2 py-0.5 rounded-full bg-[#D5B47A] text-[#3B080F] text-[10px] font-bold">
+                              المقطع المعتمد حالياً
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-cream-200/60 mt-0.5 truncate">
+                          {preset.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Preview play button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!previewAudioRef.current) return;
+                            if (isPresetPlaying) {
+                              previewAudioRef.current.pause();
+                              setIsMusicPreviewPlaying(false);
+                            } else {
+                              setResolvedPreviewUrl(preset.url);
+                              setTimeout(() => {
+                                if (previewAudioRef.current) {
+                                  previewAudioRef.current.play().catch(() => {});
+                                  setIsMusicPreviewPlaying(true);
+                                }
+                              }, 50);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-[#3B080F] hover:bg-[#590D19] border border-[#D5B47A]/40 text-xs text-[#D5B47A] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          {isPresetPlaying ? (
+                            <>
+                              <Pause className="w-3.5 h-3.5" />
+                              <span>إيقاف</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5" />
+                              <span>استماع</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Select preset button */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMusicPreset(preset.url)}
+                          disabled={isSelected}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            isSelected
+                              ? 'bg-[#D5B47A]/20 text-[#D5B47A] border border-[#D5B47A]/40 cursor-default'
+                              : 'bg-[#D5B47A] hover:bg-[#E8C88C] text-[#3B080F] shadow-sm cursor-pointer'
+                          }`}
+                        >
+                          {isSelected ? 'مختار ✓' : 'اختيار'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+
+            {/* Custom Music URL or Upload */}
+            <div className="pt-4 border-t border-[#D5B47A]/20 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-cream-200">
+                  أو استخدم رابط ملف صوتي مباشر (MP3 URL)
+                </label>
+                <input
+                  type="text"
+                  value={musicUrl.startsWith('idb://') ? '' : musicUrl}
+                  onChange={(e) => {
+                    setMusicUrl(e.target.value);
+                    setResolvedPreviewUrl(e.target.value);
+                    setIsMusicPreviewPlaying(false);
+                  }}
+                  placeholder="https://example.com/romantic-melody.mp3"
+                  className="w-full bg-[#230408] border border-[#D5B47A]/40 rounded-xl px-4 py-2.5 text-[#F2E3C3] focus:outline-none focus:ring-1 focus:ring-[#D5B47A]"
+                />
+              </div>
+
+              {/* MP3 File Upload */}
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-cream-200">
+                  أو ارفع ملف صوتي خاص من جهازك
+                </label>
+                <label className="border-2 border-dashed border-[#D5B47A]/40 hover:border-[#D5B47A] rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-[#230408]/60 transition-colors">
+                  <Upload className="w-8 h-8 text-[#D5B47A] mb-2" />
+                  <span className="text-sm font-semibold text-cream-200">انقر هنا لاختيار ملف MP3</span>
+                  <span className="text-xs text-cream-200/50 mt-1">
+                    يدعم ملفات MP3 حتى 20 ميجابايت (يُحفظ بأمان دون مساس بالذاكرة)
+                  </span>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleMusicUpload(file);
+                    }}
+                  />
+                </label>
+                {musicUrl.startsWith('idb://') && (
+                  <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>تم رفع وحفظ ملفك الصوتي بنجاح وجاهز للتشغيل!</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Active Audio Preview Player */}
+              {(resolvedPreviewUrl || musicUrl) && (
+                <div className="p-4 rounded-xl bg-[#230408] border border-[#D5B47A]/30 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Volume2 className="w-4 h-4 text-[#D5B47A] flex-shrink-0" />
+                    <span className="text-xs text-cream-200/80 truncate">
+                      {musicUrl.startsWith('idb://')
+                        ? 'ملف صوتي خاص مرفوع'
+                        : musicUrl}
+                    </span>
+                  </div>
+
+                  <audio
+                    ref={previewAudioRef}
+                    src={resolvedPreviewUrl || musicUrl}
+                    onEnded={() => setIsMusicPreviewPlaying(false)}
+                    onError={() => setIsMusicPreviewPlaying(false)}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!previewAudioRef.current) return;
+                      if (isMusicPreviewPlaying) {
+                        previewAudioRef.current.pause();
+                        setIsMusicPreviewPlaying(false);
+                      } else {
+                        previewAudioRef.current
+                          .play()
+                          .then(() => setIsMusicPreviewPlaying(true))
+                          .catch(() => {
+                            alert('تعذر تشغيل المعاينة، تأكد من صحة الرابط أو الملف.');
+                          });
+                      }
+                    }}
+                    className="px-4 py-1.5 rounded-full bg-[#590D19] hover:bg-[#781324] border border-[#D5B47A]/40 text-xs text-[#D5B47A] flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
+                  >
+                    {isMusicPreviewPlaying ? (
+                      <>
+                        <Pause className="w-3.5 h-3.5" />
+                        <span>إيقاف المعاينة</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        <span>تشغيل المقطع الحالي</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1020,6 +1232,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
       </main>
+
+      {/* Interactive Image Cropper Modal */}
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageUrl={cropperImageUrl}
+        onCropComplete={handleCropComplete}
+        onClose={() => {
+          setCropperOpen(false);
+          setCropperTargetIndex(null);
+        }}
+      />
     </div>
   );
 };
