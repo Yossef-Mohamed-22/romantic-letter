@@ -433,8 +433,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return `${base}/?data=${payloadEncoded}`;
   }, [payloadEncoded, useVercelDomain, isLocalhost]);
 
+  const [shortened, setShortened] = useState<{ long: string; short: string } | null>(null);
+
+  // Auto-shorten the link (debounced) so the displayed link is always the short one
+  useEffect(() => {
+    if (!shareableUrl || shortened?.long === shareableUrl) return;
+    const timer = setTimeout(async () => {
+      const short = await shortenUrl(shareableUrl);
+      if (short !== shareableUrl) setShortened({ long: shareableUrl, short });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [shareableUrl]);
+
+  const displayUrl = shortened?.long === shareableUrl ? shortened.short : shareableUrl;
+
   const copyToClipboard = async () => {
-    const shortUrl = await shortenUrl(shareableUrl);
+    const shortUrl = shortened?.long === shareableUrl ? shortened.short : await shortenUrl(shareableUrl);
     await navigator.clipboard.writeText(shortUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -1445,7 +1459,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <input
                 type="text"
                 readOnly
-                value={shareableUrl}
+                value={displayUrl}
                 className="w-full bg-transparent text-xs sm:text-sm text-[#D5B47A] font-mono select-all focus:outline-none text-center sm:text-left"
               />
               <button
