@@ -9,7 +9,6 @@ import {
   X,
   Crop,
   Move,
-  Sparkles,
 } from 'lucide-react';
 
 interface ImageCropperModalProps {
@@ -17,7 +16,6 @@ interface ImageCropperModalProps {
   imageUrl: string;
   onCropComplete: (croppedDataUrl: string) => void;
   onClose: () => void;
-  aspectRatioLabel?: string;
 }
 
 type AspectRatio = '1:1' | '4:5' | '4:3';
@@ -35,12 +33,16 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Reset state when a new image is loaded
+  // Box dimensions in DOM (standardized across viewports)
+  const boxWidth = aspectRatio === '1:1' ? 300 : aspectRatio === '4:5' ? 260 : 340;
+  const boxHeight = aspectRatio === '1:1' ? 300 : aspectRatio === '4:5' ? 325 : 255;
+
+  // Reset state when modal opens or image changes
   useEffect(() => {
     if (isOpen) {
       setZoom(1);
@@ -61,7 +63,15 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Mouse & Touch Pan Handling
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    setImageLoaded(true);
+    setOffset({ x: 0, y: 0 });
+    setZoom(1);
+  };
+
+  // Mouse & Touch Drag Pan Handling
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -109,18 +119,30 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   const handleRotate = () => {
     setRotation((prev) => (prev + 90) % 360);
+    setOffset({ x: 0, y: 0 });
   };
 
-  // Perform High-Resolution Off-screen Crop
+  // Calculate Base Dimensions to ALWAYS Cover the Crop Box (Zero Black Bars!)
+  const isRotated90 = rotation % 180 !== 0;
+  const effectiveNatW = isRotated90 ? naturalSize.height : naturalSize.width;
+  const effectiveNatH = isRotated90 ? naturalSize.width : naturalSize.height;
+
+  const scaleToCover =
+    effectiveNatW > 0 && effectiveNatH > 0
+      ? Math.max(boxWidth / effectiveNatW, boxHeight / effectiveNatH)
+      : 1;
+
+  const baseWidth = naturalSize.width * scaleToCover;
+  const baseHeight = naturalSize.height * scaleToCover;
+
+  // Apply High-Resolution Crop strictly matching the visual viewport
   const handleApplyCrop = useCallback(() => {
-    if (!imageRef.current || !containerRef.current) return;
+    if (!imageRef.current || naturalSize.width === 0 || naturalSize.height === 0) return;
     setIsProcessing(true);
 
     const img = imageRef.current;
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
 
-    // Determine target output resolution
+    // Target output resolution
     const outputWidth = 800;
     const outputHeight =
       aspectRatio === '1:1' ? 800 : aspectRatio === '4:5' ? 1000 : 600;
@@ -135,63 +157,54 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
       return;
     }
 
-    // High quality image smoothing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Fill background with warm vintage tone
-    ctx.fillStyle = '#1D0306';
-    ctx.fillRect(0, 0, outputWidth, outputHeight);
+    // Scale factor from DOM crop box to output canvas
+    const canvasScale = outputWidth / boxWidth;
 
-    // Calculate crop coordinates
-    ctx.save();
+    // 1. Move canvas origin to center
     ctx.translate(outputWidth / 2, outputHeight / 2);
+
+    // 2. Apply user rotation
     ctx.rotate((rotation * Math.PI) / 180);
 
-    // Scale mapping from container viewport to canvas
-    const scaleRatio = outputWidth / rect.width;
-    const finalScale = zoom * scaleRatio;
+    // 3. Apply zoom & scale mapping
+    ctx.scale(zoom * canvasScale, zoom * canvasScale);
 
-    ctx.translate(offset.x * scaleRatio, offset.y * scaleRatio);
+    // 4. Apply offset (drag pan position)
+    // Note: since rotation is already applied to context, translate coordinates directly
+    ctx.translate(offset.x, offset.y);
 
-    // Draw image centered
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    let drawW = outputWidth;
-    let drawH = outputWidth / imgAspect;
+    // 5. Draw image centered around (0, 0) - Fills the entire frame seamlessly!
+    ctx.drawImage(img, -baseWidth / 2, -baseHeight / 2, baseWidth, baseHeight);
 
-    if (drawH < outputHeight) {
-      drawH = outputHeight;
-      drawW = outputHeight * imgAspect;
-    }
-
-    drawW *= zoom;
-    drawH *= zoom;
-
-    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-    ctx.restore();
-
-    // Export optimized WebP/JPEG
+    // Export crisp, high-quality JPEG (zero black bars!)
     try {
-      const croppedUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
       onCropComplete(croppedUrl);
       onClose();
     } catch (err) {
       console.error('Crop export failed:', err);
-      alert('تعذر قص الصورة، تأكد من أن الرابط يسمح بالتعديل.');
+      alert('تعذر استخراج الصورة، يرجى المحاولة مرة أخرى.');
     } finally {
       setIsProcessing(false);
     }
-  }, [aspectRatio, zoom, rotation, offset, onCropComplete, onClose]);
+  }, [
+    aspectRatio,
+    boxWidth,
+    boxHeight,
+    zoom,
+    rotation,
+    offset,
+    naturalSize,
+    baseWidth,
+    baseHeight,
+    onCropComplete,
+    onClose,
+  ]);
 
   if (!isOpen) return null;
-
-  // Aspect ratio dimensions for preview frame
-  const cropBoxAspectStyle =
-    aspectRatio === '1:1'
-      ? 'w-[260px] h-[260px] sm:w-[320px] sm:h-[320px]'
-      : aspectRatio === '4:5'
-      ? 'w-[240px] h-[300px] sm:w-[280px] sm:h-[350px]'
-      : 'w-[280px] h-[210px] sm:w-[360px] sm:h-[270px]';
 
   return (
     <AnimatePresence>
@@ -207,11 +220,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#D5B47A]/25 bg-[#230408]">
             <div className="flex items-center gap-2 text-[#D5B47A] font-aref text-lg font-bold">
               <Crop className="w-5 h-5 text-[#D5B47A]" />
-              <span>تعديل وقص صورة الذكرى</span>
+              <span>قص وتعديل الصورة (ملء كامل بدون أي حواف سوداء)</span>
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-full text-cream-200/60 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1 rounded-full text-cream-200/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -222,30 +235,39 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             <span className="text-cream-200/70 ml-2">نسبة القص:</span>
             <button
               type="button"
-              onClick={() => setAspectRatio('1:1')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+              onClick={() => {
+                setAspectRatio('1:1');
+                setOffset({ x: 0, y: 0 });
+              }}
+              className={`px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
                 aspectRatio === '1:1'
                   ? 'bg-[#D5B47A] text-[#3B080F] shadow-sm'
                   : 'bg-[#3B080F] text-[#F2E3C3]/80 hover:bg-[#590D19]'
               }`}
             >
-              1:1 مربع (بولارويد)
+              1:1 مربع (الأفضل للبولارويد)
             </button>
             <button
               type="button"
-              onClick={() => setAspectRatio('4:5')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+              onClick={() => {
+                setAspectRatio('4:5');
+                setOffset({ x: 0, y: 0 });
+              }}
+              className={`px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
                 aspectRatio === '4:5'
                   ? 'bg-[#D5B47A] text-[#3B080F] shadow-sm'
                   : 'bg-[#3B080F] text-[#F2E3C3]/80 hover:bg-[#590D19]'
               }`}
             >
-              4:5 طولي
+              4:5 طولي أنيق
             </button>
             <button
               type="button"
-              onClick={() => setAspectRatio('4:3')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+              onClick={() => {
+                setAspectRatio('4:3');
+                setOffset({ x: 0, y: 0 });
+              }}
+              className={`px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
                 aspectRatio === '4:3'
                   ? 'bg-[#D5B47A] text-[#3B080F] shadow-sm'
                   : 'bg-[#3B080F] text-[#F2E3C3]/80 hover:bg-[#590D19]'
@@ -256,17 +278,17 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           </div>
 
           {/* Interactive Workspace Canvas */}
-          <div className="relative w-full h-[320px] sm:h-[380px] bg-black/70 flex items-center justify-center overflow-hidden select-none">
+          <div className="relative w-full h-[330px] sm:h-[380px] bg-black/80 flex items-center justify-center overflow-hidden select-none">
             {/* The Crop Target Frame Box */}
             <div
-              ref={containerRef}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className={`relative ${cropBoxAspectStyle} rounded-lg overflow-hidden border-2 border-[#D5B47A] shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] cursor-move z-10 flex items-center justify-center`}
+              style={{ width: `${boxWidth}px`, height: `${boxHeight}px` }}
+              className="relative rounded-lg overflow-hidden border-2 border-[#D5B47A] shadow-[0_0_0_9999px_rgba(0,0,0,0.75)] cursor-move z-10 flex items-center justify-center"
             >
               {/* Rule-of-thirds grid guidelines */}
               <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none z-20 opacity-30">
@@ -276,31 +298,50 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 <div className="border-r border-b border-[#F2E3C3]" />
                 <div className="border-r border-b border-[#F2E3C3]" />
                 <div className="border-b border-[#F2E3C3]" />
-                <div className="border-r border-[#F2E3C3]" />
-                <div className="border-r border-[#F2E3C3]" />
+                <div className="border-r border-b border-[#F2E3C3]" />
+                <div className="border-r border-b border-[#F2E3C3]" />
                 <div />
               </div>
 
-              {/* The movable / scalable / rotatable image */}
-              <img
-                ref={imageRef}
-                src={imageUrl}
-                alt="قص الصورة"
-                crossOrigin="anonymous"
-                onLoad={() => setImageLoaded(true)}
-                draggable={false}
-                style={{
-                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                  transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                }}
-                className="max-w-none pointer-events-none select-none transition-transform will-change-transform"
-              />
+              {/* The movable / scalable / rotatable image positioned to ALWAYS cover */}
+              {imageLoaded && (
+                <img
+                  ref={imageRef}
+                  src={imageUrl}
+                  alt="قص الصورة"
+                  crossOrigin="anonymous"
+                  onLoad={handleImageLoad}
+                  draggable={false}
+                  style={{
+                    width: `${baseWidth}px`,
+                    height: `${baseHeight}px`,
+                    position: 'absolute',
+                    left: `${(boxWidth - baseWidth) / 2 + offset.x}px`,
+                    top: `${(boxHeight - baseHeight) / 2 + offset.y}px`,
+                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                    transformOrigin: 'center center',
+                    transition: isDragging ? 'none' : 'transform 0.12s ease-out',
+                  }}
+                  className="max-w-none pointer-events-none select-none will-change-transform"
+                />
+              )}
+
+              {/* Hidden image element to trigger initial load */}
+              {!imageLoaded && (
+                <img
+                  src={imageUrl}
+                  alt="تحميل"
+                  crossOrigin="anonymous"
+                  onLoad={handleImageLoad}
+                  className="hidden"
+                />
+              )}
             </div>
 
             {/* Helper drag notice badge */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 border border-[#D5B47A]/30 text-[11px] text-[#F2E3C3] backdrop-blur-sm pointer-events-none">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/70 border border-[#D5B47A]/40 text-[11px] text-[#F2E3C3] backdrop-blur-sm pointer-events-none">
               <Move className="w-3.5 h-3.5 text-[#D5B47A]" />
-              <span>اسحب الصورة لتحريكها وضبط موضعها</span>
+              <span>اسحب الصورة لتحريكها داخل الإطار الذهبي</span>
             </div>
           </div>
 
@@ -310,15 +351,15 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.max(0.8, z - 0.2))}
-                className="p-1.5 rounded-lg bg-[#3B080F] text-[#D5B47A] hover:bg-[#590D19]"
+                onClick={() => setZoom((z) => Math.max(1, z - 0.15))}
+                className="p-1.5 rounded-lg bg-[#3B080F] text-[#D5B47A] hover:bg-[#590D19] cursor-pointer"
                 title="تصغير"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
               <input
                 type="range"
-                min="0.8"
+                min="1"
                 max="3"
                 step="0.05"
                 value={zoom}
@@ -327,8 +368,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
               />
               <button
                 type="button"
-                onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
-                className="p-1.5 rounded-lg bg-[#3B080F] text-[#D5B47A] hover:bg-[#590D19]"
+                onClick={() => setZoom((z) => Math.min(3, z + 0.15))}
+                className="p-1.5 rounded-lg bg-[#3B080F] text-[#D5B47A] hover:bg-[#590D19] cursor-pointer"
                 title="تكبير"
               >
                 <ZoomIn className="w-4 h-4" />
@@ -344,7 +385,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 <button
                   type="button"
                   onClick={handleRotate}
-                  className="px-3 py-1.5 rounded-xl bg-[#3B080F] hover:bg-[#590D19] border border-[#D5B47A]/30 text-xs text-[#F2E3C3] flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-[#3B080F] hover:bg-[#590D19] border border-[#D5B47A]/30 text-xs text-[#F2E3C3] flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="تدوير 90 درجة"
                 >
                   <RotateCw className="w-3.5 h-3.5 text-[#D5B47A]" />
@@ -353,7 +394,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-3 py-1.5 rounded-xl bg-[#3B080F] hover:bg-[#590D19] border border-[#D5B47A]/30 text-xs text-[#F2E3C3] flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-[#3B080F] hover:bg-[#590D19] border border-[#D5B47A]/30 text-xs text-[#F2E3C3] flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="إعادة تعيين الموضع"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-[#D5B47A]" />
@@ -365,7 +406,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl bg-transparent hover:bg-white/5 text-xs text-cream-200/70 hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-xl bg-transparent hover:bg-white/5 text-xs text-cream-200/70 hover:text-white transition-colors cursor-pointer"
                 >
                   إلغاء
                 </button>
@@ -380,7 +421,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                   ) : (
                     <>
                       <Check className="w-4 h-4 text-[#3B080F]" />
-                      <span>قص وحفظ الصورة</span>
+                      <span>قص وتطبيق الصورة</span>
                     </>
                   )}
                 </button>
