@@ -69,7 +69,7 @@ export const INITIAL_DEFAULT_LETTER: Letter = {
   closing_message: 'دائماً وأبداً في قلبي وخاطري.. أحبك ❤️',
   allow_any_name: true,
   music_enabled: true,
-  music_url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=romantic-piano-112199.mp3',
+  music_url: '/audio/romantic-piano.mp3',
   design_settings: DEFAULT_DESIGN,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

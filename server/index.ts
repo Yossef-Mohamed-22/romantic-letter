@@ -243,12 +243,65 @@ app.post('/api/upload/image', requireAuth, uploadImage.single('image'), (req: Re
   res.json({ url: fileUrl });
 });
 
+// Direct Cloud Upload Proxy (bypasses browser CORS restrictions completely)
+app.post('/api/upload-to-cloud', async (req: Request, res: Response) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'لم يتم توفير الصورة' });
+    }
+
+    if (image.startsWith('http://') || image.startsWith('https://')) {
+      return res.json({ url: image });
+    }
+
+    const base64Data = image.replace(/^data:image\/[a-z]+;base64,/, '');
+
+    const body = new URLSearchParams();
+    body.append('key', '6d207e02198a847aa98d0a2a901485a5');
+    body.append('action', 'upload');
+    body.append('format', 'json');
+    body.append('source', base64Data);
+
+    const cloudRes = await fetch('https://freeimage.host/api/1/upload', {
+      method: 'POST',
+      body,
+    });
+
+    if (cloudRes.ok) {
+      const data: any = await cloudRes.json();
+      if (data?.image?.url) {
+        return res.json({ url: data.image.url });
+      }
+    }
+    res.status(502).json({ error: 'فشل خادم الرفع السحابي' });
+  } catch (err: any) {
+    console.error('Cloud proxy upload error:', err);
+    res.status(500).json({ error: err.message || 'خطأ في رفع الصورة' });
+  }
+});
+
 // Upload music file
 app.post('/api/upload/music', requireAuth, uploadMusic.single('music'), (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'لم يتم استلام أي ملف صوتي' });
   }
   const fileUrl = `/uploads/music/${req.file.filename}`;
+
+  // Also make available in public/audio and dist/audio for portable access
+  try {
+    const audioDir = path.resolve(process.cwd(), 'public/audio');
+    if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+    fs.copyFileSync(req.file.path, path.join(audioDir, 'custom-music.mp3'));
+    
+    const distAudioDir = path.resolve(process.cwd(), 'dist/audio');
+    if (fs.existsSync(distAudioDir)) {
+      fs.copyFileSync(req.file.path, path.join(distAudioDir, 'custom-music.mp3'));
+    }
+  } catch (e) {
+    console.warn('Could not mirror custom music to public/audio:', e);
+  }
+
   res.json({ url: fileUrl });
 });
 

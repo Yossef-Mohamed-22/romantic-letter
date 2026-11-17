@@ -151,7 +151,7 @@ export const api = {
       closing_message: letterData.closing_message || '❤️',
       allow_any_name: true,
       music_enabled: letterData.music_enabled ?? true,
-      music_url: letterData.music_url,
+      music_url: letterData.music_url || '/audio/romantic-piano.mp3',
       design_settings: letterData.design_settings || DEFAULT_DESIGN,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

@@ -13,7 +13,7 @@
       "closing_message": "دائماً وأبداً في قلبي وخاطري.. أحبك ❤️",
       "secret_password_hash": "$2a$10$En/qRb0eSby5OKA1co8uyeqGkJ5xvk39nwGzo2xUoXNNCZkGF43l2",
       "music_enabled": true,
-      "music_url": "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=romantic-piano-112199.mp3",
+      "music_url": "/audio/romantic-piano.mp3",
       "design_settings": {
         "backgroundColor": "#3B080F",
         "envelopeColor": "#590D19",

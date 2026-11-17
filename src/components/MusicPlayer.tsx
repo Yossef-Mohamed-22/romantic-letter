@@ -20,8 +20,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [audioSource, setAudioSource] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const fallbackAudio =
-    'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=romantic-piano-112199.mp3';
+  const fallbackAudio = '/audio/romantic-piano.mp3';
   const effectiveUrl = musicUrl || fallbackAudio;
 
   // Resolve IndexedDB or regular URL

@@ -80,7 +80,10 @@ export const App: React.FC = () => {
         if (payloadData) {
           if (payloadData.title) data.title = payloadData.title;
           if (payloadData.music_url) {
-            data.music_url = payloadData.music_url;
+            data.music_url =
+              payloadData.music_url.includes('pixabay') || payloadData.music_url.startsWith('idb://')
+                ? '/audio/romantic-piano.mp3'
+                : payloadData.music_url;
             data.music_enabled = payloadData.music_enabled !== false;
           }
           if (payloadData.design_settings) {
@@ -125,7 +128,10 @@ export const App: React.FC = () => {
       if (payloadData.message) mergedLetter.message = payloadData.message;
       if (payloadData.closing_message) mergedLetter.closing_message = payloadData.closing_message;
       if (payloadData.music_url) {
-        mergedLetter.music_url = payloadData.music_url;
+        mergedLetter.music_url =
+          payloadData.music_url.includes('pixabay') || payloadData.music_url.startsWith('idb://')
+            ? '/audio/romantic-piano.mp3'
+            : payloadData.music_url;
         mergedLetter.music_enabled = payloadData.music_enabled !== false;
       }
       if (payloadData.design_settings) {

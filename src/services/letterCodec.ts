@@ -30,13 +30,20 @@ export function encodeLetterToPayload(letter: {
   design_settings?: DesignSettings;
   memories?: { image_url: string; caption: string; display_order?: number }[];
 }): string {
+  const cleanMusicUrl =
+    !letter.music_url ||
+    letter.music_url.includes('pixabay') ||
+    letter.music_url.startsWith('idb://')
+      ? '/audio/romantic-piano.mp3'
+      : letter.music_url;
+
   const payload: CompactLetterPayload = {
     v: 1,
     t: letter.title,
     r: letter.recipient_name,
     m: letter.message,
     c: letter.closing_message,
-    mu: letter.music_url,
+    mu: cleanMusicUrl,
     me: letter.music_enabled !== false,
     ds: letter.design_settings,
     mem: (letter.memories || []).map((mem, idx) => ({
@@ -85,12 +92,17 @@ export function decodeLetterFromPayload(encoded: string): Partial<Letter> | null
       display_order: m.o || idx + 1,
     }));
 
+    const cleanMu =
+      !payload.mu || payload.mu.includes('pixabay') || payload.mu.startsWith('idb://')
+        ? '/audio/romantic-piano.mp3'
+        : payload.mu;
+
     return {
       title: payload.t,
       recipient_name: payload.r,
       message: payload.m,
       closing_message: payload.c,
-      music_url: payload.mu,
+      music_url: cleanMu,
       music_enabled: payload.me !== false,
       design_settings: payload.ds as DesignSettings | undefined,
       memories: memories.length > 0 ? memories : undefined,

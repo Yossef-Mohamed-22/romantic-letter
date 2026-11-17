@@ -81,6 +81,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageUrl, setCropperImageUrl] = useState('');
   const [cropperTargetIndex, setCropperTargetIndex] = useState<number | null>(null);
+  const [isUploadingToCloud, setIsUploadingToCloud] = useState<boolean>(false);
 
   // Resolve Audio Preview URL whenever musicUrl changes
   useEffect(() => {
@@ -148,12 +149,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   };
 
+  // Ensure all memory images are uploaded to the cloud CDN (universal HTTPS) before saving or link generation
+  const ensureAllMemoriesUploaded = async (
+    currentMems: Omit<Memory, 'id' | 'letter_id'>[]
+  ): Promise<Omit<Memory, 'id' | 'letter_id'>[]> => {
+    const hasDataUrls = currentMems.some((m) => m.image_url?.startsWith('data:'));
+    if (!hasDataUrls) return currentMems;
+
+    setIsUploadingToCloud(true);
+    const updated = await Promise.all(
+      currentMems.map(async (mem) => {
+        if (mem.image_url && mem.image_url.startsWith('data:')) {
+          try {
+            const cloudUrl = await uploadImageToCloud(mem.image_url);
+            if (cloudUrl && cloudUrl.startsWith('http')) {
+              return { ...mem, image_url: cloudUrl };
+            }
+          } catch (e) {
+            console.warn('Auto cloud upload error:', e);
+          }
+        }
+        return mem;
+      })
+    );
+    setIsUploadingToCloud(false);
+    setMemories(updated);
+    return updated;
+  };
+
   const handleSave = async () => {
     if (!currentLetterId) return;
     setIsSaving(true);
     setErrorMsg('');
     try {
-      // 1. Update letter details
+      // 1. Ensure any newly uploaded or cropped photos are pushed to cloud CDN
+      const readyMemories = await ensureAllMemoriesUploaded(memories);
+
+      // Clean music url: fallback to default if empty or IDB
+      const effectiveMusicUrl =
+        !musicUrl || musicUrl.includes('pixabay') || musicUrl.startsWith('idb://')
+          ? '/audio/romantic-piano.mp3'
+          : musicUrl;
+
+      // 2. Update letter details
       await api.updateLetter(token, currentLetterId, {
         title,
         recipient_name: recipientName,
@@ -162,12 +200,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         closing_message: closingMessage,
         secret_password: secretPassword ? secretPassword : undefined,
         music_enabled: musicEnabled,
-        music_url: musicUrl,
+        music_url: effectiveMusicUrl,
         design_settings: designSettings,
       });
 
-      // 2. Update memories
-      await api.updateMemories(token, currentLetterId, memories);
+      // 3. Update memories
+      await api.updateMemories(token, currentLetterId, readyMemories);
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -188,6 +226,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         message: 'أنتِ النبض الذي يحيي أيامي، والجمال الذي يزين عالمي.. ❤️',
         closing_message: 'أحبك دائماً وأبداً ❤️',
         secret_password: '123',
+        music_enabled: true,
+        music_url: '/audio/romantic-piano.mp3',
         design_settings: designSettings,
       });
       await loadLetters(true);
@@ -235,16 +275,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleCropComplete = async (croppedDataUrl: string) => {
     if (cropperTargetIndex === null) return;
     const targetIdx = cropperTargetIndex;
-    const updated = [...memories];
-    updated[targetIdx] = {
-      ...updated[targetIdx],
-      image_url: croppedDataUrl,
-    };
-    setMemories(updated);
+    
+    // 1. Immediately update UI preview
+    setMemories((prev) => {
+      const copy = [...prev];
+      if (copy[targetIdx]) {
+        copy[targetIdx] = { ...copy[targetIdx], image_url: croppedDataUrl };
+      }
+      return copy;
+    });
     setCropperOpen(false);
     setCropperTargetIndex(null);
 
-    // Upload cropped photo to cloud CDN in background for universal link sharing
+    // 2. Upload cropped photo to cloud CDN so it can be shared in universal links
+    setIsUploadingToCloud(true);
     try {
       const cloudUrl = await uploadImageToCloud(croppedDataUrl);
       if (cloudUrl && cloudUrl.startsWith('http')) {
@@ -261,6 +305,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     } catch (err) {
       console.warn('Could not upload cropped image to cloud CDN:', err);
+    } finally {
+      setIsUploadingToCloud(false);
     }
   };
 
@@ -347,14 +393,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleGenerateLink = async () => {
-    await handleSave();
-    navigator.clipboard.writeText(shareableUrl);
-    setCopiedLink(true);
-    setGenerateSuccessMessage('تم إنشاء وتحديث رابط الرسالة بنجاح بكل تعديلاتك، وتم نسخه لحافظتك جاهزاً للمشاركة! ❤️');
-    setTimeout(() => {
-      setCopiedLink(false);
-      setGenerateSuccessMessage('');
-    }, 4500);
+    setIsSaving(true);
+    try {
+      // 1. Ensure all memory images are uploaded to the cloud CDN
+      const readyMemories = await ensureAllMemoriesUploaded(memories);
+
+      // Clean music url: fallback to default if empty or IDB
+      const effectiveMusicUrl =
+        !musicUrl || musicUrl.includes('pixabay') || musicUrl.startsWith('idb://')
+          ? '/audio/romantic-piano.mp3'
+          : musicUrl;
+
+      // 2. Save everything to backend
+      if (currentLetterId) {
+        await api.updateLetter(token, currentLetterId, {
+          title,
+          recipient_name: recipientName,
+          allow_any_name: allowAnyName,
+          message,
+          closing_message: closingMessage,
+          secret_password: secretPassword ? secretPassword : undefined,
+          music_enabled: musicEnabled,
+          music_url: effectiveMusicUrl,
+          design_settings: designSettings,
+        });
+        await api.updateMemories(token, currentLetterId, readyMemories);
+      }
+
+      // 3. Compute fresh link with ALL real photos and song directly
+      const freshPayload = encodeLetterToPayload({
+        title,
+        recipient_name: recipientName,
+        message,
+        closing_message: closingMessage,
+        music_url: effectiveMusicUrl,
+        music_enabled: musicEnabled,
+        design_settings: designSettings,
+        memories: readyMemories,
+      });
+
+      const base = isLocalhost && useVercelDomain ? PRODUCTION_DOMAIN : window.location.origin;
+      const freshUrl = `${base}/?data=${freshPayload}`;
+
+      await navigator.clipboard.writeText(freshUrl);
+      setCopiedLink(true);
+      setGenerateSuccessMessage('تم إنشاء وتحديث رابط الرسالة بنجاح بكل الصور والموسيقى وتعديلاتك، وتم نسخه لحافظتك جاهزاً للمشاركة! ❤️');
+      setTimeout(() => {
+        setCopiedLink(false);
+        setGenerateSuccessMessage('');
+      }, 5000);
+    } catch (err: any) {
+      alert('حدث خطأ أثناء إنشاء الرابط: ' + (err.message || err));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading) {
@@ -386,6 +478,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {isUploadingToCloud && (
+              <span className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#230408] border border-[#D5B47A]/30 text-xs text-[#D5B47A] animate-pulse">
+                <div className="w-3 h-3 border-2 border-[#D5B47A] border-t-transparent rounded-full animate-spin" />
+                <span>جارِ رفع الصور للسحابة... ☁️</span>
+              </span>
+            )}
             <button
               onClick={() => onPreviewLetter(currentLetterId)}
               className="px-3.5 py-1.5 rounded-full bg-[#590D19] hover:bg-[#781324] border border-[#D5B47A]/40 text-xs sm:text-sm font-amiri text-[#F2E3C3] flex items-center gap-1.5 transition-colors shadow"
@@ -1230,15 +1328,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button
                 onClick={handleGenerateLink}
                 disabled={isSaving}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-full font-aref text-xl font-bold transition-all duration-300 shadow-xl flex items-center justify-center gap-3 mx-auto cursor-pointer"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full font-aref text-xl font-bold transition-all duration-300 shadow-xl flex items-center justify-center gap-3 mx-auto cursor-pointer disabled:opacity-60"
                 style={{
                   background: 'linear-gradient(135deg, #8A1525 0%, #590D19 50%, #3B080F 100%)',
                   color: '#F2E3C3',
                   border: '2px solid #D5B47A',
                 }}
               >
-                <Heart className="w-6 h-6 text-rose-300 fill-rose-300" />
-                <span>إنشاء وتحديث رابط الرسالة ❤️</span>
+                {isSaving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-[#D5B47A] border-t-transparent rounded-full animate-spin" />
+                    <span>جارِ تجهيز وحفظ الصور والموسيقى... ⏳</span>
+                  </>
+                ) : (
+                  <>
+                    <Heart className="w-6 h-6 text-rose-300 fill-rose-300" />
+                    <span>إنشاء وتحديث رابط الرسالة ❤️</span>
+                  </>
+                )}
               </button>
 
               {generateSuccessMessage && (
