@@ -41,6 +41,25 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     };
   }, [effectiveUrl]);
 
+  // Listen for immediate synchronous prime trigger from envelope tap
+  useEffect(() => {
+    const handlePrime = () => {
+      if (audioRef.current && musicEnabled) {
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setHasInteracted(true);
+          })
+          .catch((err) => {
+            console.log('Mobile audio prime waiting for direct user tap:', err);
+          });
+      }
+    };
+    window.addEventListener('prime-romantic-audio', handlePrime);
+    return () => window.removeEventListener('prime-romantic-audio', handlePrime);
+  }, [musicEnabled]);
+
   // Attempt play when autoPlayTrigger becomes true (after envelope opened)
   useEffect(() => {
     if (musicEnabled && autoPlayTrigger && !isPlaying && !hasInteracted) {
@@ -56,7 +75,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           });
       }
     }
-  }, [autoPlayTrigger, musicEnabled]);
+  }, [autoPlayTrigger, musicEnabled, isPlaying, hasInteracted]);
 
   const togglePlay = () => {
     setHasInteracted(true);
@@ -82,7 +101,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       <button
         onClick={togglePlay}
         aria-label={isPlaying ? 'إيقاف الموسيقى' : 'تشغيل الموسيقى'}
-        className="group relative flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-[#3B080F]/85 hover:bg-[#590D19] border border-[#D5B47A]/50 text-[#F2E3C3] backdrop-blur-md shadow-lg transition-all duration-300"
+        className={`group relative flex items-center gap-2.5 px-3.5 py-2 rounded-full backdrop-blur-md shadow-lg transition-all duration-300 cursor-pointer ${
+          isPlaying
+            ? 'bg-[#3B080F]/85 hover:bg-[#590D19] border border-[#D5B47A]/50 text-[#F2E3C3]'
+            : 'bg-[#590D19] hover:bg-[#781324] border-2 border-[#D5B47A] text-[#FFF5DD] animate-pulse shadow-[0_0_15px_rgba(213,180,122,0.4)]'
+        }`}
       >
         {/* Animated equalizer waves when playing */}
         {isPlaying ? (
@@ -92,11 +115,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             <span className="w-1 bg-[#D5B47A] rounded-full animate-[pulse_0.7s_ease-in-out_infinite_0.4s] h-2" />
           </div>
         ) : (
-          <VolumeX className="w-4 h-4 text-[#D5B47A]/70 group-hover:text-[#D5B47A]" />
+          <Music className="w-4 h-4 text-[#D5B47A] animate-bounce" />
         )}
 
-        <span className="text-xs font-amiri text-[#F2E3C3]/80 group-hover:text-[#F2E3C3] hidden sm:inline">
-          {isPlaying ? 'الموسيقى تعمل' : 'تشغيل الموسيقى'}
+        <span className="text-xs font-amiri text-[#F2E3C3] font-semibold">
+          {isPlaying ? 'الموسيقى تعمل 🎵' : 'تشغيل الموسيقى 🎵'}
         </span>
       </button>
     </div>

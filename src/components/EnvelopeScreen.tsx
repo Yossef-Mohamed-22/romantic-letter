@@ -28,6 +28,9 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
     setIsOpening(true);
 
     try {
+      // Prime audio playback synchronously in user gesture context (fixes mobile Safari/Chrome autoplay block)
+      window.dispatchEvent(new CustomEvent('prime-romantic-audio'));
+
       // 1. Trigger open animation immediately with zero delay
       setIsOpenAnimationStarted(true);
 

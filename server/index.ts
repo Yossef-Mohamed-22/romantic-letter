@@ -69,6 +69,7 @@ const uploadMusic = multer({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use(express.static(path.resolve(process.cwd(), 'public')));
 
 // Serve production frontend if dist exists
 const DIST_DIR = path.resolve(process.cwd(), 'dist');

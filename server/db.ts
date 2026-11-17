@@ -38,7 +38,7 @@ const DEFAULT_DESIGN: DesignSettings = {
 
 const DEFAULT_MEMORIES: Omit<Memory, 'id' | 'letter_id'>[] = [
   {
-    image_url: 'https://iili.io/o2g5zWG.jpg',
+    image_url: 'https://iili.io/o2r3jse.jpg',
     caption: 'أول لقاء وأجمل صدفة جمعتنا.. حين ابتدأ العمر حقاً ❤️',
     display_order: 1,
   },

@@ -163,20 +163,20 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     // Scale factor from DOM crop box to output canvas
     const canvasScale = outputWidth / boxWidth;
 
-    // 1. Move canvas origin to center
-    ctx.translate(outputWidth / 2, outputHeight / 2);
+    // Center of image in DOM space including drag offset
+    const centerDomX = boxWidth / 2 + offset.x;
+    const centerDomY = boxHeight / 2 + offset.y;
 
-    // 2. Apply user rotation
+    // 1. Move canvas origin to the user's dragged center in output canvas coordinates
+    ctx.translate(centerDomX * canvasScale, centerDomY * canvasScale);
+
+    // 2. Apply user rotation around image center (exactly matching CSS transform)
     ctx.rotate((rotation * Math.PI) / 180);
 
-    // 3. Apply zoom & scale mapping
+    // 3. Apply zoom & canvas scale mapping
     ctx.scale(zoom * canvasScale, zoom * canvasScale);
 
-    // 4. Apply offset (drag pan position)
-    // Note: since rotation is already applied to context, translate coordinates directly
-    ctx.translate(offset.x, offset.y);
-
-    // 5. Draw image centered around (0, 0) - Fills the entire frame seamlessly!
+    // 4. Draw image centered around (0, 0) - Fills the entire frame seamlessly!
     ctx.drawImage(img, -baseWidth / 2, -baseHeight / 2, baseWidth, baseHeight);
 
     // Export crisp, high-quality JPEG (zero black bars!)
