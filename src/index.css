@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply m-0 p-0 antialiased;
+    font-family: 'Amiri', serif;
+    background-color: #3B080F;
+    color: #F2E3C3;
+    -webkit-tap-highlight-color: transparent;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  ::selection {
+    background-color: #590D19;
+    color: #F2E3C3;
+  }
+}
+
+/* Custom Scrollbar for romantic aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(35, 4, 8, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(213, 180, 122, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(213, 180, 122, 0.7);
+}
+
+/* Hide scrollbar for tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
