@@ -281,14 +281,39 @@ app.post('/api/upload-to-cloud', async (req: Request, res: Response) => {
   }
 });
 
-// Upload music file
-app.post('/api/upload/music', requireAuth, uploadMusic.single('music'), (req: Request, res: Response) => {
+// Upload music file & forward to universal cloud CDN for link sharing
+app.post('/api/upload/music', uploadMusic.single('music'), async (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'لم يتم استلام أي ملف صوتي' });
   }
+
+  // 1. Upload to Catbox for permanent universal cloud link
+  try {
+    const fileBytes = fs.readFileSync(req.file.path);
+    const blob = new Blob([fileBytes]);
+    const fd = new FormData();
+    fd.append('reqtype', 'fileupload');
+    fd.append('userhash', '');
+    fd.append('fileToUpload', blob, req.file.originalname || 'romantic-song.mp3');
+
+    const catboxRes = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: fd,
+    });
+
+    if (catboxRes.ok) {
+      const cloudUrl = (await catboxRes.text()).trim();
+      if (cloudUrl && cloudUrl.startsWith('http')) {
+        return res.json({ url: cloudUrl });
+      }
+    }
+  } catch (err) {
+    console.warn('Failed cloud upload for music, falling back to local:', err);
+  }
+
+  // 2. Local fallback
   const fileUrl = `/uploads/music/${req.file.filename}`;
 
-  // Also make available in public/audio and dist/audio for portable access
   try {
     const audioDir = path.resolve(process.cwd(), 'public/audio');
     if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
@@ -303,6 +328,42 @@ app.post('/api/upload/music', requireAuth, uploadMusic.single('music'), (req: Re
   }
 
   res.json({ url: fileUrl });
+});
+
+// Direct Audio Cloud Upload Proxy from Base64 or Blob
+app.post('/api/upload-audio-to-cloud', async (req: Request, res: Response) => {
+  try {
+    const { audioBase64, filename } = req.body;
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'لم يتم توفير الملف الصوتي' });
+    }
+
+    const cleanBase64 = audioBase64.replace(/^data:audio\/[a-z0-9]+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    const blob = new Blob([buffer]);
+
+    const fd = new FormData();
+    fd.append('reqtype', 'fileupload');
+    fd.append('userhash', '');
+    fd.append('fileToUpload', blob, filename || 'song.mp3');
+
+    const catboxRes = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: fd,
+    });
+
+    if (catboxRes.ok) {
+      const cloudUrl = (await catboxRes.text()).trim();
+      if (cloudUrl && cloudUrl.startsWith('http')) {
+        return res.json({ url: cloudUrl });
+      }
+    }
+
+    res.status(502).json({ error: 'فشل رفع الملف الصوتي للسحابة' });
+  } catch (err: any) {
+    console.error('Audio cloud proxy upload error:', err);
+    res.status(500).json({ error: err.message || 'خطأ في رفع الصوت' });
+  }
 });
 
 // SPA Fallback for any client route

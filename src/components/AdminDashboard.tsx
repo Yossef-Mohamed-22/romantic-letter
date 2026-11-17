@@ -31,9 +31,9 @@ import { api } from '../services/api.ts';
 import { DesignSettings, Letter, Memory } from '../types/index.ts';
 import { ImageCropperModal } from './ImageCropperModal.tsx';
 import { ROMANTIC_MUSIC_PRESETS } from '../services/musicPresets.ts';
-import { resolveAudioUrl } from '../services/storage.ts';
+import { resolveAudioUrl, getAudioFromIDB } from '../services/storage.ts';
 import { encodeLetterToPayload } from '../services/letterCodec.ts';
-import { uploadImageToCloud } from '../services/cloudUpload.ts';
+import { uploadImageToCloud, uploadAudioToCloud } from '../services/cloudUpload.ts';
 
 const PRODUCTION_DOMAIN = 'https://romantic-letter-mu.vercel.app';
 
@@ -82,6 +82,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [cropperImageUrl, setCropperImageUrl] = useState('');
   const [cropperTargetIndex, setCropperTargetIndex] = useState<number | null>(null);
   const [isUploadingToCloud, setIsUploadingToCloud] = useState<boolean>(false);
+  const [isAudioUploading, setIsAudioUploading] = useState<boolean>(false);
 
   // Resolve Audio Preview URL whenever musicUrl changes
   useEffect(() => {
@@ -177,6 +178,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return updated;
   };
 
+  // Ensure audio is hosted on a permanent universal HTTPS URL before saving or generating link
+  const ensureAudioUploaded = async (currentUrl: string): Promise<string> => {
+    if (!currentUrl) return 'https://files.catbox.moe/7e5i0i.mp3';
+    if (currentUrl.startsWith('http://') || currentUrl.startsWith('https://')) {
+      if (currentUrl.includes('pixabay')) return 'https://files.catbox.moe/7e5i0i.mp3';
+      return currentUrl;
+    }
+    if (currentUrl.startsWith('/audio/')) {
+      return currentUrl;
+    }
+
+    if (currentUrl.startsWith('idb://')) {
+      try {
+        const key = currentUrl.replace('idb://', '');
+        const blob = await getAudioFromIDB(key);
+        if (blob) {
+          setIsAudioUploading(true);
+          const cloudUrl = await uploadAudioToCloud(blob, 'romantic-song.mp3');
+          setIsAudioUploading(false);
+          if (cloudUrl && cloudUrl.startsWith('http')) {
+            setMusicUrl(cloudUrl);
+            return cloudUrl;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to upload IDB audio to cloud:', e);
+      } finally {
+        setIsAudioUploading(false);
+      }
+    }
+
+    return currentUrl || 'https://files.catbox.moe/7e5i0i.mp3';
+  };
+
   const handleSave = async () => {
     if (!currentLetterId) return;
     setIsSaving(true);
@@ -185,13 +220,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       // 1. Ensure any newly uploaded or cropped photos are pushed to cloud CDN
       const readyMemories = await ensureAllMemoriesUploaded(memories);
 
-      // Clean music url: fallback to default if empty or IDB
-      const effectiveMusicUrl =
-        !musicUrl || musicUrl.includes('pixabay') || musicUrl.startsWith('idb://')
-          ? '/audio/romantic-piano.mp3'
-          : musicUrl;
+      // 2. Ensure audio is universal cloud HTTPS URL
+      const effectiveMusicUrl = await ensureAudioUploaded(musicUrl);
 
-      // 2. Update letter details
+      // 3. Update letter details
       await api.updateLetter(token, currentLetterId, {
         title,
         recipient_name: recipientName,
@@ -204,7 +236,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         design_settings: designSettings,
       });
 
-      // 3. Update memories
+      // 4. Update memories
       await api.updateMemories(token, currentLetterId, readyMemories);
 
       setSaveSuccess(true);
@@ -342,15 +374,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Music upload & Presets
   const handleMusicUpload = async (file: File) => {
+    setIsAudioUploading(true);
     try {
-      const url = await api.uploadMusic(token, file);
-      setMusicUrl(url);
+      // Upload to universal cloud CDN so it can be shared with anyone
+      let cloudUrl = await uploadAudioToCloud(file, file.name);
+
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        // Fallback to local server / IDB
+        cloudUrl = await api.uploadMusic(token, file);
+      }
+
+      setMusicUrl(cloudUrl);
       setMusicEnabled(true);
-      const resolved = await resolveAudioUrl(url);
+      const resolved = await resolveAudioUrl(cloudUrl);
       setResolvedPreviewUrl(resolved);
       setIsMusicPreviewPlaying(false);
     } catch (err: any) {
       alert(err.message || 'فشل رفع الملف الصوتي');
+    } finally {
+      setIsAudioUploading(false);
     }
   };
 
@@ -398,11 +440,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       // 1. Ensure all memory images are uploaded to the cloud CDN
       const readyMemories = await ensureAllMemoriesUploaded(memories);
 
-      // Clean music url: fallback to default if empty or IDB
-      const effectiveMusicUrl =
-        !musicUrl || musicUrl.includes('pixabay') || musicUrl.startsWith('idb://')
-          ? '/audio/romantic-piano.mp3'
-          : musicUrl;
+      // 2. Ensure audio is universal cloud HTTPS URL
+      const effectiveMusicUrl = await ensureAudioUploaded(musicUrl);
 
       // 2. Save everything to backend
       if (currentLetterId) {
@@ -1035,14 +1074,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     }}
                   />
                 </label>
+                {isAudioUploading && (
+                  <div className="mt-2 p-3 rounded-lg bg-[#230408] border border-[#D5B47A]/40 text-xs text-[#D5B47A] flex items-center justify-center gap-2 animate-pulse">
+                    <div className="w-4 h-4 border-2 border-[#D5B47A] border-t-transparent rounded-full animate-spin" />
+                    <span>جارِ رفع وحفظ مقطعك الصوتي في السحابة ليعمل عالمياً مع الرابط... 🎵</span>
+                  </div>
+                )}
+                {musicUrl.startsWith('http') && !musicUrl.includes('7e5i0i') && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-200 flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>مقطعك الصوتي الخاص مرفوع ومحفوظ بنجاح، وسيعمل لدى المستلم فوراً!</span>
+                  </div>
+                )}
                 {musicUrl.startsWith('idb://') && (
                   <div className="mt-2 p-3 rounded-lg bg-[#590D19]/40 border border-[#D5B47A]/30 text-xs text-cream-200/90 leading-relaxed text-right space-y-1">
                     <p className="text-emerald-400 font-bold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" />
-                      <span>تم حفظ ملفك الصوتي بنجاح على هذا المتصفح!</span>
-                    </p>
-                    <p className="text-cream-200/70 text-[11px]">
-                      💡 لمشاركة الرابط مع أي شخص حول العالم ليعمل الصوت فوراً على أي هاتف، يُفضل اختيار إحدى المقطوعات الـ 5 بالأعلى أو وضع رابط MP3 مباشر لتضمينه في رابط المشاركة.
+                      <span>تم حفظ ملفك الصوتي بنجاح، وسيتم رفعه تلقائياً مع الرابط الجديد!</span>
                     </p>
                   </div>
                 )}

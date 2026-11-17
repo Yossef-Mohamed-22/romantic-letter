@@ -64,3 +64,50 @@ export async function uploadImageToCloud(dataUrlOrFile: string | File | Blob): P
 
   return dataUrl;
 }
+
+/**
+ * Uploads an audio file or blob to public high-speed cloud CDN (Catbox).
+ * Returns the permanent public HTTPS URL of the MP3 file.
+ */
+export async function uploadAudioToCloud(fileOrBlob: File | Blob, filename = 'romantic-song.mp3'): Promise<string> {
+  // Strategy 1: Try local backend upload endpoint
+  try {
+    const formData = new FormData();
+    formData.append('music', fileOrBlob, filename);
+    const res = await fetch('/api/upload/music', {
+      method: 'POST',
+      body: formData,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.url && data.url.startsWith('http')) {
+        return data.url;
+      }
+    }
+  } catch (e) {
+    // proceed to fallback
+  }
+
+  // Strategy 2: Direct Catbox upload (CORS-friendly public CDN)
+  try {
+    const fd = new FormData();
+    fd.append('reqtype', 'fileupload');
+    fd.append('userhash', '');
+    fd.append('fileToUpload', fileOrBlob, filename);
+
+    const catboxRes = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: fd,
+    });
+    if (catboxRes.ok) {
+      const text = (await catboxRes.text()).trim();
+      if (text && text.startsWith('http')) {
+        return text;
+      }
+    }
+  } catch (err) {
+    console.warn('Direct catbox audio upload failed:', err);
+  }
+
+  return '';
+}

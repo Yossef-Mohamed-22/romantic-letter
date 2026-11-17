@@ -34,7 +34,7 @@ export function encodeLetterToPayload(letter: {
     !letter.music_url ||
     letter.music_url.includes('pixabay') ||
     letter.music_url.startsWith('idb://')
-      ? '/audio/romantic-piano.mp3'
+      ? 'https://files.catbox.moe/7e5i0i.mp3'
       : letter.music_url;
 
   const payload: CompactLetterPayload = {
@@ -94,7 +94,7 @@ export function decodeLetterFromPayload(encoded: string): Partial<Letter> | null
 
     const cleanMu =
       !payload.mu || payload.mu.includes('pixabay') || payload.mu.startsWith('idb://')
-        ? '/audio/romantic-piano.mp3'
+        ? 'https://files.catbox.moe/7e5i0i.mp3'
         : payload.mu;
 
     return {

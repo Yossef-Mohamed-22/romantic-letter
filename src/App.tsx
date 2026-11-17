@@ -82,7 +82,7 @@ export const App: React.FC = () => {
           if (payloadData.music_url) {
             data.music_url =
               payloadData.music_url.includes('pixabay') || payloadData.music_url.startsWith('idb://')
-                ? '/audio/romantic-piano.mp3'
+                ? 'https://files.catbox.moe/7e5i0i.mp3'
                 : payloadData.music_url;
             data.music_enabled = payloadData.music_enabled !== false;
           }
@@ -130,7 +130,7 @@ export const App: React.FC = () => {
       if (payloadData.music_url) {
         mergedLetter.music_url =
           payloadData.music_url.includes('pixabay') || payloadData.music_url.startsWith('idb://')
-            ? '/audio/romantic-piano.mp3'
+            ? 'https://files.catbox.moe/7e5i0i.mp3'
             : payloadData.music_url;
         mergedLetter.music_enabled = payloadData.music_enabled !== false;
       }
