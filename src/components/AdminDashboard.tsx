@@ -377,11 +377,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsAudioUploading(true);
     try {
       // Upload to universal cloud CDN so it can be shared with anyone
-      let cloudUrl = await uploadAudioToCloud(file, file.name);
+      const cloudUrl = await uploadAudioToCloud(file, file.name);
 
       if (!cloudUrl || !cloudUrl.startsWith('http')) {
-        // Fallback to local server / IDB
-        cloudUrl = await api.uploadMusic(token, file);
+        // Don't silently fall back to a device-only copy: it would not play on the shared link.
+        alert(
+          'تعذّر رفع الملف الصوتي للإنترنت (قد يكون حجمه كبيراً). ' +
+            'جرّب ملفاً أصغر من 4 ميجا، أو ارفع الأغنية على موقع مثل catbox.moe والصق الرابط المباشر في خانة رابط الموسيقى.'
+        );
+        return;
       }
 
       setMusicUrl(cloudUrl);
