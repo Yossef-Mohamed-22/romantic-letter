@@ -15,15 +15,14 @@ export const WaxSeal: React.FC<WaxSealProps> = ({
   return (
     <motion.div
       onClick={onClick}
-      className="relative cursor-pointer select-none z-30"
+      className="relative cursor-pointer select-none z-30 transform-gpu will-change-transform"
       initial={{ scale: 1, rotate: 0 }}
       animate={
         isBreaking
           ? {
-              scale: [1, 1.25, 0],
+              scale: [1, 1.15, 0],
               opacity: [1, 0.8, 0],
-              rotate: [0, 15, -25],
-              filter: ['blur(0px)', 'blur(2px)', 'blur(8px)'],
+              rotate: [0, 8, -12],
             }
           : {
               scale: [1, 1.03, 1],
@@ -31,7 +30,7 @@ export const WaxSeal: React.FC<WaxSealProps> = ({
       }
       transition={
         isBreaking
-          ? { duration: 0.9, ease: [0.4, 0, 0.2, 1] }
+          ? { duration: 0.4, ease: 'easeOut' }
           : { repeat: Infinity, duration: 4, ease: 'easeInOut' }
       }
       whileHover={{ scale: 1.07 }}

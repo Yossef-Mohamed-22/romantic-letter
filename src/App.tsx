@@ -81,10 +81,10 @@ export const App: React.FC = () => {
     const letter = await api.unlockLetter(letterId, password);
     setUnlockedLetter(letter);
 
-    // After animation delay in EnvelopeScreen, switch to letter view
+    // Fast, responsive, buttery-smooth transition to letter view
     setTimeout(() => {
       setView('letter');
-    }, 2400);
+    }, 1100);
   };
 
   // Admin login handler
@@ -187,11 +187,11 @@ export const App: React.FC = () => {
         ) : view === 'letter' && unlockedLetter ? (
           <motion.div
             key="letter"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            className="w-full flex-1 flex items-center justify-center p-3 sm:p-6 py-6 sm:py-10 my-auto"
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="w-full flex-1 flex items-center justify-center p-3 sm:p-6 py-6 sm:py-10 my-auto transform-gpu"
           >
             <LetterCard
               letter={unlockedLetter}
@@ -203,8 +203,9 @@ export const App: React.FC = () => {
             key="envelope"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full flex-1 flex items-center justify-center py-6 sm:py-10"
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="w-full flex-1 flex items-center justify-center py-6 sm:py-10 transform-gpu"
           >
             {loadError ? (
               <div className="text-center p-8 bg-[#3B080F]/90 rounded-2xl border border-red-500/30 max-w-md mx-auto">

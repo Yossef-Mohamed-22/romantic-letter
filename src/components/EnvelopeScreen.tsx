@@ -28,36 +28,33 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
     setIsOpening(true);
 
     try {
-      await onUnlockSuccess();
-
-      // Trigger opening animation sequence
+      // 1. Trigger open animation immediately with zero delay
       setIsOpenAnimationStarted(true);
 
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate([35, 50, 35]);
-        } catch {
-          // ignore if disabled
-        }
-      }
+      // Lightweight confetti burst (optimized for 60fps)
+      try {
+        confetti({
+          particleCount: 45,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#D5B47A', '#F2E3C3', '#941B2D', '#FFCCD5', '#E6C68A'],
+          disableForReducedMotion: true,
+          ticks: 160,
+        });
+      } catch {}
 
-      // 1. Confetti burst
-      confetti({
-        particleCount: 75,
-        spread: 85,
-        origin: { y: 0.6 },
-        colors: ['#D5B47A', '#F2E3C3', '#941B2D', '#FFCCD5', '#E6C68A'],
-      });
-
-      // 2. Open Flap after wax seal breaks
+      // 2. Open 3D flap quickly (after seal begins breaking at 150ms)
       setTimeout(() => {
         setIsFlapOpen(true);
-      }, 700);
+      }, 150);
 
-      // 3. Letter rises from inside envelope
+      // 3. Letter card emerges smoothly at 450ms
       setTimeout(() => {
         setIsLetterRising(true);
-      }, 1400);
+      }, 450);
+
+      // Trigger callback to fetch/unlock letter data in parallel
+      await onUnlockSuccess();
     } catch (err: any) {
       console.error('Failed to open envelope:', err);
     } finally {
@@ -69,19 +66,19 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
   const goldColor = designSettings?.goldAccentColor || '#D5B47A';
 
   return (
-    <div className="relative w-full min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-12 select-none">
+    <div className="relative w-full min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-12 select-none overflow-hidden">
       {/* Title "لكِ" above envelope */}
       <motion.div
-        initial={{ opacity: 0, y: -25 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: 'easeOut' }}
-        className="text-center mb-4 sm:mb-7 z-10"
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="text-center mb-4 sm:mb-6 z-10"
       >
         <h1
           className="font-aref text-5xl sm:text-7xl font-bold tracking-wider relative inline-block text-transparent bg-clip-text"
           style={{
             backgroundImage: `linear-gradient(135deg, #FFF5DD 0%, ${goldColor} 50%, #997434 100%)`,
-            filter: 'drop-shadow(0 4px 12px rgba(213, 180, 122, 0.4))',
+            filter: 'drop-shadow(0 3px 10px rgba(213, 180, 122, 0.35))',
           }}
         >
           لَـكِ
@@ -91,15 +88,15 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
         </p>
       </motion.div>
 
-      {/* Envelope Container with realistic 3D perspective - Fully Clickable! */}
+      {/* Envelope Container with realistic 3D perspective - GPU Accelerated */}
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.92, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        whileHover={!isOpenAnimationStarted ? { scale: 1.03 } : {}}
+        whileHover={!isOpenAnimationStarted ? { scale: 1.02 } : {}}
         whileTap={!isOpenAnimationStarted ? { scale: 0.98 } : {}}
         onClick={!isOpenAnimationStarted ? handleOpenEnvelope : undefined}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className={`relative w-full max-w-[310px] sm:max-w-[420px] md:max-w-[460px] h-[195px] sm:h-[265px] md:h-[290px] perspective-[1200px] z-10 ${
+        transition={{ duration: 0.5 }}
+        className={`relative w-full max-w-[310px] sm:max-w-[420px] md:max-w-[460px] h-[195px] sm:h-[265px] md:h-[290px] perspective-[1200px] z-10 transform-gpu ${
           !isOpenAnimationStarted ? 'cursor-pointer' : ''
         }`}
         title="اضغطي لفتح الرسالة"
@@ -108,19 +105,19 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
         <motion.div
           animate={
             isOpenAnimationStarted
-              ? { y: 30 }
-              : { y: [0, -8, 0] }
+              ? { y: 20 }
+              : { y: [0, -6, 0] }
           }
           transition={
             isOpenAnimationStarted
-              ? { duration: 1 }
-              : { repeat: Infinity, duration: 6, ease: 'easeInOut' }
+              ? { duration: 0.6 }
+              : { repeat: Infinity, duration: 5, ease: 'easeInOut' }
           }
-          className="w-full h-full relative"
+          className="w-full h-full relative transform-gpu"
         >
           {/* Envelope Main Body Card */}
           <div
-            className="w-full h-full rounded-xl relative shadow-envelope overflow-hidden border border-[#D5B47A]/30 transition-shadow duration-300 hover:shadow-[0_12px_35px_rgba(213,180,122,0.35)]"
+            className="w-full h-full rounded-xl relative shadow-2xl overflow-hidden border border-[#D5B47A]/30 transition-shadow duration-300"
             style={{
               backgroundColor: envelopeBg,
               backgroundImage: `
@@ -139,14 +136,14 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
             <AnimatePresence>
               {isLetterRising && (
                 <motion.div
-                  initial={{ y: 0, scale: 0.88, opacity: 0.8 }}
+                  initial={{ y: 0, scale: 0.9, opacity: 0.9 }}
                   animate={{
-                    y: -150,
-                    scale: 1.05,
+                    y: -140,
+                    scale: 1.04,
                     opacity: 1,
-                    transition: { duration: 1.3, ease: [0.16, 1, 0.3, 1] },
+                    transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] },
                   }}
-                  className="absolute left-6 right-6 top-8 bottom-6 rounded-md shadow-2xl p-4 flex flex-col items-center justify-center pointer-events-none z-20 border border-[#D5B47A]/40"
+                  className="absolute left-6 right-6 top-8 bottom-6 rounded-md shadow-2xl p-4 flex flex-col items-center justify-center pointer-events-none z-20 border border-[#D5B47A]/40 transform-gpu will-change-transform"
                   style={{
                     backgroundColor: designSettings?.letterPaperColor || '#F2E3C3',
                     backgroundImage: 'radial-gradient(circle at 50% 50%, #FAF0DA 0%, #F2E3C3 75%, #E2CCA1 100%)',
@@ -161,7 +158,7 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
               )}
             </AnimatePresence>
 
-            {/* Envelope Pocket Cutout Triangles (Left, Right, Bottom flaps) */}
+            {/* Envelope Pocket Cutout Triangles (Clean CSS/SVG without heavy filters) */}
             <svg
               className="absolute inset-0 w-full h-full pointer-events-none z-20"
               viewBox="0 0 460 300"
@@ -180,9 +177,6 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
                   <stop offset="0%" stopColor="#4F0913" />
                   <stop offset="100%" stopColor="#781424" />
                 </linearGradient>
-                <filter id="foldShadow" x="-10%" y="-10%" width="120%" height="120%">
-                  <feDropShadow dx="0" dy="-3" stdDeviation="4" floodColor="#000000" floodOpacity="0.5" />
-                </filter>
               </defs>
 
               {/* Left Flap */}
@@ -192,27 +186,30 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
               <polygon points="460,0 230,150 460,300" fill="url(#rightFold)" />
 
               {/* Bottom Flap */}
-              <polygon points="0,300 230,135 460,300" fill="url(#bottomFold)" filter="url(#foldShadow)" />
+              <polygon points="0,300 230,135 460,300" fill="url(#bottomFold)" />
             </svg>
           </div>
 
-          {/* Top Flap (Opens Upwards in 3D) */}
+          {/* Top Flap (Opens Upwards in 3D) - Optimized with GPU transform and backface hidden */}
           <motion.div
-            className="absolute top-0 left-0 right-0 h-[155px] sm:h-[190px] md:h-[205px] origin-top z-30"
-            style={{ transformStyle: 'preserve-3d' }}
+            className="absolute top-0 left-0 right-0 h-[155px] sm:h-[190px] md:h-[205px] origin-top z-30 transform-gpu will-change-transform"
+            style={{
+              transformStyle: 'preserve-3d',
+              backfaceVisibility: 'hidden',
+            }}
             animate={
               isFlapOpen
                 ? {
                     rotateX: 180,
                     zIndex: 10,
-                    transition: { duration: 1.1, ease: [0.4, 0, 0.2, 1] },
+                    transition: { duration: 0.65, ease: [0.25, 1, 0.5, 1] },
                   }
                 : { rotateX: 0 }
             }
           >
             {/* Top Flap SVG Triangle pointing down */}
             <svg
-              className="w-full h-full filter drop-shadow-[0_8px_14px_rgba(0,0,0,0.65)]"
+              className="w-full h-full drop-shadow-md"
               viewBox="0 0 460 200"
               preserveAspectRatio="none"
             >
@@ -230,7 +227,7 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
             </svg>
 
             {/* Wax Seal positioned at the flap tip - Clickable */}
-            <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 cursor-pointer">
+            <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 cursor-pointer z-40">
               <WaxSeal
                 isBreaking={isOpenAnimationStarted}
                 accentColor={goldColor}
@@ -243,19 +240,19 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
 
       {/* Tap to Open Action Button & Romantic Instruction */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={
           isOpenAnimationStarted
-            ? { opacity: 0, y: 35, pointerEvents: 'none' }
+            ? { opacity: 0, y: 25, pointerEvents: 'none' }
             : { opacity: 1, y: 0 }
         }
-        transition={{ duration: 0.6, delay: 0.3 }}
+        transition={{ duration: 0.4 }}
         className="mt-8 sm:mt-11 z-20 flex flex-col items-center gap-3 w-full max-w-sm px-4"
       >
         <button
           onClick={handleOpenEnvelope}
           disabled={isOpening || isOpenAnimationStarted}
-          className="group relative flex items-center justify-center gap-3 w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-full border border-[#D5B47A]/70 shadow-[0_4px_25px_rgba(213,180,122,0.3)] hover:shadow-[0_4px_35px_rgba(213,180,122,0.55)] hover:border-[#D5B47A] active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
+          className="group relative flex items-center justify-center gap-3 w-full sm:w-auto px-8 sm:px-10 py-3.5 sm:py-4 rounded-full border border-[#D5B47A]/70 shadow-[0_4px_20px_rgba(213,180,122,0.25)] hover:shadow-[0_4px_30px_rgba(213,180,122,0.45)] hover:border-[#D5B47A] active:scale-95 transition-all duration-300 backdrop-blur-md cursor-pointer"
           style={{
             background: 'linear-gradient(135deg, #781324 0%, #590D19 50%, #3B080F 100%)',
           }}
