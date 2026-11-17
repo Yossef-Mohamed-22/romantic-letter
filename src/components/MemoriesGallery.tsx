@@ -81,7 +81,7 @@ export const MemoriesGallery: React.FC<MemoriesGalleryProps> = ({
   };
 
   return (
-    <div className="relative w-full h-[100dvh] max-h-[100dvh] flex flex-col items-center justify-between px-3 sm:px-6 py-2.5 sm:py-5 select-none overflow-hidden z-20">
+    <div className="relative w-full min-h-screen flex flex-col items-center justify-between px-3 sm:px-6 py-6 sm:py-8 select-none z-20">
       {/* Top Bar: Back to letter & view switcher */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

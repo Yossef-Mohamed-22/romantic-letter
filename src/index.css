@@ -9,10 +9,8 @@
     background-color: #3B080F;
     color: #F2E3C3;
     -webkit-tap-highlight-color: transparent;
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-    overscroll-behavior: none;
+    min-height: 100%;
+    overflow-x: hidden;
   }
 
   ::selection {

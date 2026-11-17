@@ -77,7 +77,7 @@ export const EnvelopeScreen: React.FC<EnvelopeScreenProps> = ({
   const goldColor = designSettings?.goldAccentColor || '#D5B47A';
 
   return (
-    <div className="relative w-full h-[100dvh] max-h-[100dvh] flex flex-col items-center justify-center px-3 py-2 sm:py-6 overflow-hidden select-none">
+    <div className="relative w-full min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-12 select-none">
       {/* Title "لك" above envelope */}
       <motion.div
         initial={{ opacity: 0, y: -25 }}

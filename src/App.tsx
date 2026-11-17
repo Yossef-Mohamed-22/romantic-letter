@@ -110,11 +110,7 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`relative w-full ${
-        view === 'admin'
-          ? 'min-h-screen overflow-y-auto'
-          : 'h-[100dvh] max-h-[100dvh] overflow-hidden'
-      } flex flex-col justify-between`}
+      className="relative w-full min-h-screen flex flex-col justify-between overflow-x-hidden"
       dir="rtl"
       style={{ backgroundColor: currentDesign.backgroundColor }}
     >
@@ -180,7 +176,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.6 }}
-            className="w-full h-full flex flex-col justify-center overflow-hidden"
+            className="w-full flex-1 flex flex-col justify-center py-4 sm:py-8"
           >
             <MemoriesGallery
               memories={unlockedLetter.memories || []}
@@ -195,7 +191,7 @@ export const App: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8 }}
-            className="w-full h-full flex items-center justify-center p-2 sm:p-4 overflow-hidden"
+            className="w-full flex-1 flex items-center justify-center p-3 sm:p-6 py-6 sm:py-10 my-auto"
           >
             <LetterCard
               letter={unlockedLetter}
@@ -208,7 +204,7 @@ export const App: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="w-full h-full flex items-center justify-center overflow-hidden"
+            className="w-full flex-1 flex items-center justify-center py-6 sm:py-10"
           >
             {loadError ? (
               <div className="text-center p-8 bg-[#3B080F]/90 rounded-2xl border border-red-500/30 max-w-md mx-auto">

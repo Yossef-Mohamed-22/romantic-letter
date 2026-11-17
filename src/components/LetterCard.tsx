@@ -51,11 +51,11 @@ export const LetterCard: React.FC<LetterCardProps> = ({ letter, onOpenMemories }
       initial={{ opacity: 0, scale: 0.92, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-lg mx-auto flex items-center justify-center p-2 sm:p-4 z-20"
+      className="w-full max-w-xl mx-auto flex items-center justify-center p-3 sm:p-6 my-auto z-20"
     >
       {/* Vintage Paper Container */}
       <div
-        className="w-full relative rounded-2xl p-4 sm:p-7 md:p-9 shadow-letter overflow-hidden border border-[#D5B47A]/40 flex flex-col justify-between"
+        className="w-full relative rounded-2xl p-5 sm:p-9 md:p-11 shadow-letter overflow-hidden border border-[#D5B47A]/40 flex flex-col justify-between"
         style={{
           backgroundColor: paperBg,
           backgroundImage: `
