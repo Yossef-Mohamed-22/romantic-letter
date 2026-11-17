@@ -33,6 +33,7 @@ import { ImageCropperModal } from './ImageCropperModal.tsx';
 import { ROMANTIC_MUSIC_PRESETS } from '../services/musicPresets.ts';
 import { resolveAudioUrl } from '../services/storage.ts';
 import { encodeLetterToPayload } from '../services/letterCodec.ts';
+import { uploadImageToCloud } from '../services/cloudUpload.ts';
 
 const PRODUCTION_DOMAIN = 'https://romantic-letter-mu.vercel.app';
 
@@ -231,16 +232,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setCropperOpen(true);
   };
 
-  const handleCropComplete = (croppedDataUrl: string) => {
+  const handleCropComplete = async (croppedDataUrl: string) => {
     if (cropperTargetIndex === null) return;
+    const targetIdx = cropperTargetIndex;
     const updated = [...memories];
-    updated[cropperTargetIndex] = {
-      ...updated[cropperTargetIndex],
+    updated[targetIdx] = {
+      ...updated[targetIdx],
       image_url: croppedDataUrl,
     };
     setMemories(updated);
     setCropperOpen(false);
     setCropperTargetIndex(null);
+
+    // Upload cropped photo to cloud CDN in background for universal link sharing
+    try {
+      const cloudUrl = await uploadImageToCloud(croppedDataUrl);
+      if (cloudUrl && cloudUrl.startsWith('http')) {
+        setMemories((prev) => {
+          const fresh = [...prev];
+          if (fresh[targetIdx]) {
+            fresh[targetIdx] = {
+              ...fresh[targetIdx],
+              image_url: cloudUrl,
+            };
+          }
+          return fresh;
+        });
+      }
+    } catch (err) {
+      console.warn('Could not upload cropped image to cloud CDN:', err);
+    }
   };
 
   const handleAddMemory = () => {

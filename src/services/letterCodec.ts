@@ -40,7 +40,7 @@ export function encodeLetterToPayload(letter: {
     me: letter.music_enabled !== false,
     ds: letter.design_settings,
     mem: (letter.memories || []).map((mem, idx) => ({
-      u: mem.image_url?.startsWith('data:') ? '/images/memory-1.jpg' : mem.image_url,
+      u: mem.image_url?.startsWith('data:') ? 'https://iili.io/o2g5zWG.jpg' : mem.image_url,
       c: mem.caption,
       o: mem.display_order || idx + 1,
     })),
